@@ -7,7 +7,7 @@
   - [x] `/backend` — core сервисы, WebSocket сервер (отдельный процесс)
   - [x] `/frontend` — Next.js приложение + API Routes (BFF для REST)  
   - [x] `/docs` — документация (уже есть)
-  - [ ] `/.env.example` — пример переменных окружения
+  - [x] `/.env.example` — пример переменных окружения
   - [ ] `/docker-compose.yml` — для PostgreSQL, backend WebSocket, frontend BFF
   - [ ] `/eslint-configs/` — shared конфигурации линтеров (опционально)
 -  - [ ] Удалить `/eslint-configs/`, корневой `.eslintrc.js` покрывает все сервисы

@@ -1,7 +1,7 @@
 # 1. Инициализация и инфраструктура
 
 ## 1.1. Настройка проекта и репозитория
-- [ ] Создать Git-репозиторий с .gitignore (Node.js, Next.js, .env)
+- [x] Создать Git-репозиторий с .gitignore (Node.js, Next.js, .env)
 - [ ] Монорепозиторий: pnpm workspaces (root package.json + workspaces backend, frontend); root-скрипты делегируют сервисные
 - [ ] Создать структуру папок:
   - [ ] `/backend` — core сервисы, WebSocket сервер (отдельный процесс)

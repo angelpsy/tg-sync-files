@@ -3,9 +3,12 @@ node_modules/
 /.next/
 dist/
 
-# Env
-.env
-.env.local
+# Env - ignore all .env files except .env.example
+.env*
+!.env.example
+
+# Docker
+docker-compose.override.yml
 
 # Logs
 npm-debug.log*

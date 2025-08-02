@@ -35,19 +35,19 @@
 - [ ] Definition of Done: `.env.example` готов и переменные загружаются в приложение без ошибок
 
 ## 1.3. Docker и контейнеризация
-- [ ] Написать `docker-compose.yml` с сервисами:
-  - [ ] PostgreSQL (версия 15, переменные окружения, volume для данных)
-  - [ ] Backend WebSocket (Node.js, Dockerfile, отдельный процесс на порту 4000)
-  - [ ] Frontend + BFF (Next.js, Dockerfile, REST API Routes на порту 3000)
-  -   - [ ] Использовать default bridge сеть и прямой маппинг портов 3000, 4000 (без custom network)
-- [ ] Создать `Dockerfile` для backend:
-  - [ ] Node.js образ, установка зависимостей, копирование кода
-  - [ ] Команда запуска WebSocket сервера (`npm run start:ws`)
-  - [ ] Экспорт handlers как npm пакет для frontend
-- [ ] Создать `Dockerfile` для frontend:
-  - [ ] Node.js образ, установка зависимостей backend и frontend
-  - [ ] Сборка Next.js с включёнными API Routes
-  - [ ] Команда запуска Next.js сервера (только BFF API, без WebSocket)
+- [x] Написать `docker-compose.yml` с сервисами:
+  - [x] PostgreSQL (версия 15, переменные окружения, volume для данных)
+  - [x] Backend WebSocket (Node.js, Dockerfile, отдельный процесс на порту 4000)
+  - [x] Frontend + BFF (Next.js, Dockerfile, REST API Routes на порту 3000)
+  - [x] Использовать default bridge сеть и прямой маппинг портов 3000, 4000 (без custom network)
+- [x] Создать `Dockerfile` для backend:
+  - [x] Node.js образ, установка зависимостей, копирование кода
+  - [x] Команда запуска WebSocket сервера (`npm run start:ws`)
+  - [x] Экспорт handlers как npm пакет для frontend
+- [x] Создать `Dockerfile` для frontend:
+  - [x] Node.js образ, установка зависимостей backend и frontend
+  - [x] Сборка Next.js с включёнными API Routes
+  - [x] Команда запуска Next.js сервера (только BFF API, без WebSocket)
 - [ ] Definition of Done: `docker-compose up` запускает все контейнеры без ошибок
 
 ## 1.4. Node.js и TypeScript

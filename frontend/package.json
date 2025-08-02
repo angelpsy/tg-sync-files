@@ -14,8 +14,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "next-auth": "^4.24.11",
-    "socket.io-client": "^4.8.1",
-    "@tg-sync-files/backend": "workspace:*"
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

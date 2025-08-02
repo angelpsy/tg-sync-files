@@ -9,7 +9,12 @@
     "build": "pnpm --filter backend build && pnpm --filter frontend build",
     "lint": "eslint . --ext .js,.ts,.tsx",
     "format": "prettier --write .",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:dev": "docker compose -f docker-compose.yml up --build",
+    "docker:logs": "docker compose logs -f",
+    "docker:clean": "docker compose down -v --remove-orphans"
   },
   "devDependencies": {
     "eslint": "^9.32.0",

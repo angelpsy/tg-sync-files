@@ -2,11 +2,11 @@
 
 ## 1.1. Настройка проекта и репозитория
 - [x] Создать Git-репозиторий с .gitignore (Node.js, Next.js, .env)
-- [ ] Монорепозиторий: pnpm workspaces (root package.json + workspaces backend, frontend); root-скрипты делегируют сервисные
+- [x] Монорепозиторий: pnpm workspaces (root package.json + workspaces backend, frontend); root-скрипты делегируют сервисные
 - [ ] Создать структуру папок:
-  - [ ] `/backend` — core сервисы, WebSocket сервер (отдельный процесс)
-  - [ ] `/frontend` — Next.js приложение + API Routes (BFF для REST)
-  - [ ] `/docs` — документация (уже есть)
+  - [x] `/backend` — core сервисы, WebSocket сервер (отдельный процесс)
+  - [x] `/frontend` — Next.js приложение + API Routes (BFF для REST)  
+  - [x] `/docs` — документация (уже есть)
   - [ ] `/.env.example` — пример переменных окружения
   - [ ] `/docker-compose.yml` — для PostgreSQL, backend WebSocket, frontend BFF
   - [ ] `/eslint-configs/` — shared конфигурации линтеров (опционально)

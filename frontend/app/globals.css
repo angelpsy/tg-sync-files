@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* Custom CSS variables for theming */
+:root {
+  --color-background: #ffffff;
+  --color-foreground: #0f1419;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f1419;
+  --color-primary: #1e293b;
+  --color-primary-foreground: #f1f5f9;
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #1e293b;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #f1f5f9;
+  --color-border: #e2e8f0;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --color-background: #0f1419;
+  --color-foreground: #f1f5f9;
+  --color-card: #0f1419;
+  --color-card-foreground: #f1f5f9;
+  --color-primary: #f1f5f9;
+  --color-primary-foreground: #1e293b;
+  --color-secondary: #334155;
+  --color-secondary-foreground: #f1f5f9;
+  --color-muted: #334155;
+  --color-muted-foreground: #94a3b8;
+  --color-destructive: #7f1d1d;
+  --color-destructive-foreground: #f1f5f9;
+  --color-border: #334155;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  border-color: var(--color-border);
+}

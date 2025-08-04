@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Telegram channel configuration
+model TelegramChannel {
+  id        String   @id @default(cuid())
+  channelId String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  fileSyncEvents FileSyncEvent[]
+
+  @@map("telegram_channels")
+}
+
+// File sync events tracking
+model FileSyncEvent {
+  id        String    @id @default(cuid())
+  fileName  String
+  filePath  String
+  channelId String
+  status    SyncStatus @default(PENDING)
+  error     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  channel TelegramChannel @relation(fields: [channelId], references: [channelId])
+
+  @@map("file_sync_events")
+}
+
+// Enum for sync status
+enum SyncStatus {
+  PENDING
+  SYNCING
+  COMPLETED
+  ERROR
+}

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/types": ["./types"],
+      "@backend/*": ["./backend/src/*"],
+      "@frontend/*": ["./frontend/*"]
+    }
+  },
+  "include": [
+    "types/**/*"
+  ]
+}

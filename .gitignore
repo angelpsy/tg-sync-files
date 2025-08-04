@@ -1,7 +1,12 @@
 # Node.js
 node_modules/
 /.next/
+*/.next/
 dist/
+
+# TypeScript incremental build info
+*.tsbuildinfo
+tsconfig.tsbuildinfo
 
 # Env - ignore all .env files except .env.example
 .env*

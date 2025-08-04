@@ -3,14 +3,15 @@
 ## 1.1. Настройка проекта и репозитория
 - [x] Создать Git-репозиторий с .gitignore (Node.js, Next.js, .env)
 - [x] Монорепозиторий: pnpm workspaces (root package.json + workspaces backend, frontend); root-скрипты делегируют сервисные
-- [ ] Создать структуру папок:
+- [x] Создать структуру папок:
   - [x] `/backend` — core сервисы, WebSocket сервер (отдельный процесс)
   - [x] `/frontend` — Next.js приложение + API Routes (BFF для REST)  
   - [x] `/docs` — документация (уже есть)
   - [x] `/.env.example` — пример переменных окружения
-  - [ ] `/docker-compose.yml` — для PostgreSQL, backend WebSocket, frontend BFF
-  - [ ] `/eslint-configs/` — shared конфигурации линтеров (опционально)
--  - [ ] Удалить `/eslint-configs/`, корневой `.eslintrc.js` покрывает все сервисы
+  - [x] `/docker-compose.yml` — для PostgreSQL, backend WebSocket, frontend BFF
+  - [x] Next.js App Router структура инициализирована
+  - [x] Tailwind CSS v4 настроен
+  - [x] TypeScript конфигурация для frontend
 - [ ] Создать базовые конфигурационные файлы:
   - [ ] `.eslintrc.js` — базовый ESLint конфиг для всего проекта
   - [ ] `.prettierrc` — единый Prettier конфиг

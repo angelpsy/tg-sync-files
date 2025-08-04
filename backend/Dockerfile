@@ -10,6 +10,7 @@ WORKDIR /app
 # Copy root package.json and workspace files
 COPY package.json pnpm-workspace.yaml ./
 COPY pnpm-lock.yaml ./
+COPY tsconfig.base.json ./
 
 # Copy shared types
 COPY types/ ./types/

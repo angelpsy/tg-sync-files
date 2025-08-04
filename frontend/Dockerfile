@@ -10,6 +10,7 @@ WORKDIR /app
 # Copy root package.json and workspace files
 COPY package.json pnpm-workspace.yaml ./
 COPY pnpm-lock.yaml ./
+COPY tsconfig.base.json ./
 
 # Copy shared types
 COPY types/ ./types/
@@ -23,12 +24,18 @@ RUN pnpm install --frozen-lockfile
 # Copy frontend source
 COPY frontend/ ./frontend/
 
+# Add build args for Next.js environment variables
+ARG NEXT_PUBLIC_WS_ENDPOINT
+ARG FRONTEND_PORT
+ENV NEXT_PUBLIC_WS_ENDPOINT=$NEXT_PUBLIC_WS_ENDPOINT
+ENV FRONTEND_PORT=$FRONTEND_PORT
+
 # Build Next.js application
 WORKDIR /app/frontend
 RUN pnpm build
 
 # Expose frontend port
-EXPOSE 3000
+EXPOSE $FRONTEND_PORT
 
 # Start Next.js server (BFF API only)
-CMD ["pnpm", "start"]
+CMD ["sh", "-c", "pnpm start -p $FRONTEND_PORT"]

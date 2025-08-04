@@ -52,6 +52,8 @@ pnpm docker:clean
 - **Dockerfile:** `backend/Dockerfile`
 - **Команда:** `pnpm start:ws`
 - **Зависимости:** PostgreSQL (healthcheck)
+- **База данных:** Prisma ORM с PostgreSQL
+- **Схема:** `backend/prisma/schema.prisma`
 
 ### Frontend BFF (`frontend`)
 - **Порт:** 3000

@@ -2,6 +2,12 @@
  * Database configuration utilities
  */
 
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+// Load environment variables from root .env file
+config({ path: resolve(process.cwd(), '../.env') });
+
 /**
  * Generate PostgreSQL connection URL from environment variables
  * @throws {Error} When POSTGRES_USER, POSTGRES_PASSWORD, or POSTGRES_DB are not provided

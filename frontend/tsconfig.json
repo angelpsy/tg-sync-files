@@ -11,7 +11,7 @@
         "name": "next"
       }
     ],
-    
+
     // Frontend-специфичные алиасы
     "baseUrl": ".",
     "paths": {
@@ -27,6 +27,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "../types/**/*"
-, "next.config.js", "postcss.config.js"  ]
+    "../types/**/*",
+    "next.config.js",
+    "postcss.config.js"
+  ]
 }

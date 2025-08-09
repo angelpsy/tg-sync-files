@@ -2,8 +2,9 @@
  * Database configuration utilities
  */
 
-import { config } from 'dotenv';
 import { resolve } from 'path';
+
+import { config } from 'dotenv';
 
 // Load environment variables from root .env file
 config({ path: resolve(process.cwd(), '../.env') });

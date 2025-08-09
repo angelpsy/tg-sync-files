@@ -30,9 +30,9 @@ export interface FileSyncEvent {
 /**
  * WebSocket message types
  */
-export type WSMessageType = 
+export type WSMessageType =
   | 'file_sync_start'
-  | 'file_sync_progress' 
+  | 'file_sync_progress'
   | 'file_sync_complete'
   | 'file_sync_error'
   | 'channel_status_update';
@@ -40,7 +40,7 @@ export type WSMessageType =
 /**
  * WebSocket message structure
  */
-export interface WSMessage<T = any> {
+export interface WSMessage<T = unknown> {
   type: WSMessageType;
   payload: T;
   timestamp: number;
@@ -49,7 +49,7 @@ export interface WSMessage<T = any> {
 /**
  * API Response wrapper
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

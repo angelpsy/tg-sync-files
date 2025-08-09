@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export async function GET() {
   return NextResponse.json({
@@ -14,10 +15,10 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     // Здесь можно добавить логику для взаимодействия с backend
     // Например, отправка команд через WebSocket
-    
+
     return NextResponse.json({
       success: true,
       data: {
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
         payload: body,
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         success: false,

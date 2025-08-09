@@ -9,18 +9,12 @@ export const metadata: Metadata = {
   description: 'Sync files to Telegram channels',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={inter.className}>
         <div className="text-green-500 min-h-screen bg-background">
-          <main className="container mx-auto px-4 py-8">
-            {children}
-          </main>
+          <main className="container mx-auto px-4 py-8">{children}</main>
         </div>
       </body>
     </html>

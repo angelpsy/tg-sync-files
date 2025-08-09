@@ -2,10 +2,11 @@
  * WebSocket server for Telegram FileSync
  */
 
-import { config } from 'dotenv';
-import { resolve } from 'path';
-import { Server } from 'socket.io';
 import { createServer } from 'node:http';
+import { resolve } from 'path';
+
+import { config } from 'dotenv';
+import { Server } from 'socket.io';
 
 // Load environment variables from root .env file
 config({ path: resolve(process.cwd(), '../.env') });
@@ -21,8 +22,13 @@ interface FileSyncEvent {
   error?: string;
 }
 
-interface WSMessage<T = any> {
-  type: 'file_sync_start' | 'file_sync_progress' | 'file_sync_complete' | 'file_sync_error' | 'channel_status_update';
+interface WSMessage<T = unknown> {
+  type:
+    | 'file_sync_start'
+    | 'file_sync_progress'
+    | 'file_sync_complete'
+    | 'file_sync_error'
+    | 'channel_status_update';
   payload: T;
   timestamp: number;
 }
@@ -57,15 +63,15 @@ const server = createServer();
 const io = new Server(server, {
   cors: {
     origin: getCorsOrigins(),
-    methods: ["GET", "POST"]
-  }
+    methods: ['GET', 'POST'],
+  },
 });
 
 console.log('🚀 Starting WebSocket server...');
 console.log('📡 CORS origins:', getCorsOrigins());
 
 // Connection handling
-io.on('connection', (socket) => {
+io.on('connection', socket => {
   console.log(`✅ Client connected: ${socket.id}`);
 
   // Send welcome message
@@ -73,11 +79,11 @@ io.on('connection', (socket) => {
     type: 'channel_status_update',
     payload: {
       message: 'Connected to Telegram FileSync WebSocket server',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     },
-    timestamp: Date.now()
+    timestamp: Date.now(),
   };
-  
+
   socket.emit('message', welcomeMessage);
 
   // Simulate file sync events for testing
@@ -89,7 +95,7 @@ io.on('connection', (socket) => {
         filePath: '/test-files/document.pdf',
         channelId: '-1001234567890',
         status: 'pending',
-        timestamp: new Date()
+        timestamp: new Date(),
       },
       {
         id: `event-${Date.now()}-2`,
@@ -97,7 +103,7 @@ io.on('connection', (socket) => {
         filePath: '/test-files/image.jpg',
         channelId: '-1009876543210',
         status: 'syncing',
-        timestamp: new Date()
+        timestamp: new Date(),
       },
       {
         id: `event-${Date.now()}-3`,
@@ -105,22 +111,29 @@ io.on('connection', (socket) => {
         filePath: '/test-files/video.mp4',
         channelId: '-1001234567890',
         status: 'completed',
-        timestamp: new Date()
-      }
+        timestamp: new Date(),
+      },
     ];
 
     events.forEach((event, index) => {
-      setTimeout(() => {
-        const message: WSMessage<FileSyncEvent> = {
-          type: index === 0 ? 'file_sync_start' : 
-                index === 1 ? 'file_sync_progress' : 'file_sync_complete',
-          payload: event,
-          timestamp: Date.now()
-        };
-        
-        socket.emit('message', message);
-        console.log(`📤 Sent ${message.type} event for ${event.fileName}`);
-      }, (index + 1) * 2000); // Send events every 2 seconds
+      setTimeout(
+        () => {
+          const message: WSMessage<FileSyncEvent> = {
+            type:
+              index === 0
+                ? 'file_sync_start'
+                : index === 1
+                  ? 'file_sync_progress'
+                  : 'file_sync_complete',
+            payload: event,
+            timestamp: Date.now(),
+          };
+
+          socket.emit('message', message);
+          console.log(`📤 Sent ${message.type} event for ${event.fileName}`);
+        },
+        (index + 1) * 2000
+      ); // Send events every 2 seconds
     });
 
     // Send an error event after 10 seconds
@@ -132,13 +145,13 @@ io.on('connection', (socket) => {
         channelId: '-1001234567890',
         status: 'error',
         timestamp: new Date(),
-        error: 'File is corrupted or too large for Telegram'
+        error: 'File is corrupted or too large for Telegram',
       };
 
       const errorMessage: WSMessage<FileSyncEvent> = {
         type: 'file_sync_error',
         payload: errorEvent,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       socket.emit('message', errorMessage);
@@ -150,12 +163,12 @@ io.on('connection', (socket) => {
   setTimeout(simulateFileEvents, 3000);
 
   // Handle disconnection
-  socket.on('disconnect', (reason) => {
+  socket.on('disconnect', reason => {
     console.log(`❌ Client disconnected: ${socket.id}, reason: ${reason}`);
   });
 
   // Handle custom events from client
-  socket.on('ping', (data) => {
+  socket.on('ping', data => {
     console.log(`🏓 Received ping:`, data);
     socket.emit('pong', { message: 'pong', timestamp: Date.now() });
   });

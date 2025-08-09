@@ -5,36 +5,30 @@
     "lib": ["ES2022"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    
+
     // Совместимость и интероперабельность
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "allowJs": true,
     "resolveJsonModule": true,
-    
+
     // Строгость и качество кода
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "isolatedModules": true,
-    
+
     // Общие алиасы путей
     "baseUrl": ".",
     "paths": {
       "@/types": ["./types"]
     }
   },
-  
+
   // Общие файлы для включения
-  "include": [
-    "types/**/*"
-  ],
-  
+  "include": ["types/**/*"],
+
   // Общие исключения
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".next"
-  ]
+  "exclude": ["node_modules", "dist", ".next"]
 }

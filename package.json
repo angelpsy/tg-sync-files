@@ -2,28 +2,65 @@
   "name": "tg-sync-files",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "types"
+  ],
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=24.5.0",
+    "pnpm": ">=10.14.0"
+  },
   "scripts": {
     "dev:backend": "pnpm --filter backend dev",
     "dev:frontend": "pnpm --filter frontend dev",
     "dev": "pnpm run dev:backend & pnpm run dev:frontend",
     "build": "pnpm --filter backend build && pnpm --filter frontend build",
+    "build:types": "pnpm --filter types build",
+    "build:docker": "docker compose build",
+    "generate:api": "echo 'API generation not configured yet'",
+    "generate:sdk": "echo 'SDK generation not configured yet'",
     "typecheck": "pnpm --filter backend typecheck && pnpm --filter frontend typecheck",
     "typecheck:watch": "tsc --noEmit --watch",
-    "lint": "eslint . --ext .js,.ts,.tsx",
+    "lint": "eslint . --ext .js,.ts,.tsx --max-warnings 0",
+    "lint:fix": "eslint . --ext .js,.ts,.tsx --fix",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "pnpm -r test",
+    "test:coverage": "pnpm -r test:coverage",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
     "docker:dev": "docker compose -f docker-compose.yml up --build",
     "docker:logs": "docker compose logs -f",
-    "docker:clean": "docker compose down -v --remove-orphans"
+    "docker:clean": "docker compose down -v --remove-orphans",
+    "prepare": "husky || true",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "install:all": "pnpm install --frozen-lockfile"
   },
   "devDependencies": {
-    "eslint": "^9.32.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^15.0.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-react": "^7.34.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
     "prettier": "^3.6.2",
+    "typescript": "^5.4.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1"
+  },
+  "lint-staged": {
+    "*.{js,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }

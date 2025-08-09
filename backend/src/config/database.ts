@@ -19,18 +19,18 @@ export function generateDatabaseUrl(): string {
     POSTGRES_PASSWORD,
     POSTGRES_HOST = 'localhost',
     POSTGRES_PORT = '5432',
-    POSTGRES_DB
+    POSTGRES_DB,
   } = process.env;
 
   // Validate critical fields
   if (!POSTGRES_USER) {
     throw new Error('POSTGRES_USER environment variable is required');
   }
-  
+
   if (!POSTGRES_PASSWORD) {
     throw new Error('POSTGRES_PASSWORD environment variable is required');
   }
-  
+
   if (!POSTGRES_DB) {
     throw new Error('POSTGRES_DB environment variable is required');
   }
@@ -44,7 +44,7 @@ export function generateDatabaseUrl(): string {
 export function getDatabaseConfig() {
   try {
     return {
-      url: process.env.DATABASE_URL || generateDatabaseUrl()
+      url: process.env.DATABASE_URL || generateDatabaseUrl(),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown database configuration error';

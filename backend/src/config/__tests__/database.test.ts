@@ -48,7 +48,9 @@ describe('Database Configuration', () => {
       process.env.POSTGRES_USER = 'testuser';
       process.env.POSTGRES_DB = 'testdb';
 
-      expect(() => generateDatabaseUrl()).toThrow('POSTGRES_PASSWORD environment variable is required');
+      expect(() => generateDatabaseUrl()).toThrow(
+        'POSTGRES_PASSWORD environment variable is required'
+      );
     });
 
     it('should throw error when POSTGRES_DB is missing', () => {
@@ -81,7 +83,9 @@ describe('Database Configuration', () => {
       delete process.env.DATABASE_URL;
       delete process.env.POSTGRES_USER;
 
-      expect(() => getDatabaseConfig()).toThrow('Database configuration failed: POSTGRES_USER environment variable is required');
+      expect(() => getDatabaseConfig()).toThrow(
+        'Database configuration failed: POSTGRES_USER environment variable is required'
+      );
     });
   });
 });

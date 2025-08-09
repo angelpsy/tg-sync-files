@@ -1,31 +1,23 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    // Backend-специфичные настройки
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "node",
     "noEmit": false,
     "outDir": "./dist",
     "rootDir": "./src",
-    
-    // Backend-специфичные алиасы
+
     "baseUrl": "./src",
     "paths": {
       "@/types": ["../../types"]
     },
-    
-    // Декораторы для будущих фреймворков (NestJS, etc.)
+
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    
-    // Node.js типы
+
     "types": ["node", "jest"]
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "dist"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["dist"]
 }

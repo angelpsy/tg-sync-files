@@ -3,12 +3,11 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/types": ["./types"],
+      "@/types/*": ["./types/*"],
       "@backend/*": ["./backend/src/*"],
-      "@frontend/*": ["./frontend/*"]
+      "@frontend/*": ["./frontend/*"],
+      "@shared/*": ["./types/*"]
     }
   },
-  "include": [
-    "types/**/*"
-  ]
+  "include": ["types/**/*"]
 }

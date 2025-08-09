@@ -14,34 +14,34 @@
   - [x] Next.js App Router структура инициализирована
   - [x] Tailwind CSS v4 настроен
   - [x] TypeScript конфигурация для frontend
-- [ ] Создать базовые конфигурационные файлы:
-  - [ ] `.eslintrc.js` — базовый ESLint конфиг для всего проекта
-  - [ ] `.prettierrc` — единый Prettier конфиг
-  - [ ] `.editorconfig` — настройки редактора
-  - [ ] `commitlint.config.js` — правила для conventional commits
-  - [ ] `.husky/` — папка с git hooks
-  - [ ] `.eslintrc.js` в корне должен покрывать весь проект; отдельного
+- [x] Создать базовые конфигурационные файлы:
+  - [x] `.eslintrc.js` — базовый ESLint конфиг для всего проекта
+  - [x] `.prettierrc` — единый Prettier конфиг
+  - [x] `.editorconfig` — настройки редактора
+  - [x] `commitlint.config.js` — правила для conventional commits
+  - [x] `.husky/` — папка с git hooks
+  - [x] `.eslintrc.js` в корне должен покрывать весь проект; отдельного
         `eslint-configs` не нужно
-- [ ] Definition of Done: репозиторий и структура созданы, все базовые конфиги
+- [x] Definition of Done: репозиторий и структура созданы, все базовые конфиги
       присутствуют и проходят начальную валидацию
 
 ## 1.2. Настройка окружения и переменных
 
-- [ ] Создать `.env.example` с переменными:
-  - [ ] `DATABASE_URL` — строка подключения к PostgreSQL
-  - [ ] `TELEGRAM_API_ID` — API ID из my.telegram.org
-  - [ ] `TELEGRAM_API_HASH` — API Hash из my.telegram.org
-  - [ ] `TELEGRAM_CHANNEL_IDS` — JSON массив ID каналов
-  - [ ] `WATCH_DIR` — базовая директория для сканирования
-  - [ ] `BACKEND_WS_PORT` — порт backend WebSocket сервера (по умолчанию 4000)
-  - [ ] `FRONTEND_PORT` — порт frontend сервера (по умолчанию 3000)
-  - [ ] `WS_ENDPOINT` — URL для подключения к WebSocket серверу
+- [x] Создать `.env.example` с переменными:
+  - [x] `DATABASE_URL` — строка подключения к PostgreSQL
+  - [x] `TELEGRAM_API_ID` — API ID из my.telegram.org
+  - [x] `TELEGRAM_API_HASH` — API Hash из my.telegram.org
+  - [x] `TELEGRAM_CHANNEL_IDS` — JSON массив ID каналов
+  - [x] `WATCH_DIR` — базовая директория для сканирования
+  - [x] `BACKEND_WS_PORT` — порт backend WebSocket сервера (по умолчанию 4000)
+  - [x] `FRONTEND_PORT` — порт frontend сервера (по умолчанию 3000)
+  - [x] `WS_ENDPOINT` — URL для подключения к WebSocket серверу
         (ws://localhost:4000)
   - [ ] Использовать `dotenv-schema` для валидации `.env` (схема
         `env.schema.json`)
-  - [ ] `TELEGRAM_CHANNEL_IDS` передается как строка с запятыми, а не
+  - [x] `TELEGRAM_CHANNEL_IDS` передается как строка с запятыми, а не
         JSON-массив
-- [ ] Definition of Done: `.env.example` готов и переменные загружаются в
+- [x] Definition of Done: `.env.example` готов и переменные загружаются в
       приложение без ошибок
 
 ## 1.3. Docker и контейнеризация
@@ -60,14 +60,14 @@
   - [x] Node.js образ, установка зависимостей backend и frontend
   - [x] Сборка Next.js с включёнными API Routes
   - [x] Команда запуска Next.js сервера (только BFF API, без WebSocket)
-- [ ] Definition of Done: `docker-compose up` запускает все контейнеры без
+- [x] Definition of Done: `docker-compose up` запускает все контейнеры без
       ошибок
 
 ## 1.4. Node.js и TypeScript
 
-- [ ] Создать `.nvmrc` с Node.js версии 24+
-- [ ] Настроить `tsconfig.base.json` в корне (target ES2024, модуль CommonJS для
+- [x] Создать `.nvmrc` с Node.js версии 24+
+- [x] Настроить `tsconfig.base.json` в корне (target ES2024, модуль CommonJS для
       Node, ESNext для браузера)
-- [ ] Установить последнюю версию TypeScript в корне и в сервисах
-- [ ] Definition of Done: `nvm use`, `tsc --noEmit` проходят без ошибок для Node
+- [x] Установить последнюю версию TypeScript в корне и в сервисах
+- [x] Definition of Done: `nvm use`, `tsc --noEmit` проходят без ошибок для Node
       и браузерной конфигурации

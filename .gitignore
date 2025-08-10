@@ -87,6 +87,7 @@ pids
 # Temporary
 tmp/
 temp/
+.tmp/
 
 # Generated files
 api-types/

@@ -1,4 +1,5 @@
 import { createServer, type Server as HttpServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 
 import { Server as IOServer, type Socket } from 'socket.io';
 
@@ -71,8 +72,32 @@ export class SocketService implements ISocketService {
       this.logger.error('WS engine connection error', { error: err.message });
     });
     this.io.on('connection', socket => this.handleConnection(socket));
-    await new Promise<void>(resolve => this.server && this.server.listen(this.opts.port, resolve));
-    const address = this.server.address();
+    const attemptListen = async (port: number): Promise<AddressInfo> => {
+      return new Promise<AddressInfo>((resolve, reject) => {
+        if (!this.server) return reject(new Error('Server not created'));
+        this.server.once('error', err => {
+          // If address in use and we have a fixed port, retry with 0 (random)
+          if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE' && port !== 0) {
+            this.logger.warn('Port in use, retrying with random free port', { port });
+            // slight delay to avoid tight loop
+            setTimeout(() => {
+              attemptListen(0).then(resolve).catch(reject);
+            }, 50);
+          } else {
+            reject(err);
+          }
+        });
+        const srv = this.server;
+        if (!srv) return reject(new Error('Server disposed before listen'));
+        srv.listen(port, () => {
+          const addr = srv.address();
+          if (!addr || typeof addr === 'string') return reject(new Error('Invalid address info'));
+          resolve(addr);
+        });
+      });
+    };
+
+    const address = await attemptListen(this.opts.port);
     this.logger.info('SocketService listening', { address });
   }
 
@@ -177,6 +202,11 @@ export class SocketService implements ISocketService {
 
   getStats() {
     const uptimeMs = Date.now() - this.startedAt.getTime();
+    const port = (() => {
+      const addr = this.server?.address();
+      if (addr && typeof addr !== 'string') return addr.port;
+      return undefined;
+    })();
     return {
       connections: this.io?.engine.clientsCount ?? 0,
       messagesIn: this.messagesIn,
@@ -185,6 +215,7 @@ export class SocketService implements ISocketService {
       uptimeMs,
       errors: this.errors,
       rateLimitDrops: this.rateLimitDrops,
+      port,
     };
   }
 

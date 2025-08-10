@@ -1,10 +1,12 @@
 import { resolve } from 'path';
 
 import { config as dotenvConfig } from 'dotenv';
+import dotenvExpand from 'dotenv-expand';
 import { z } from 'zod';
 
-// Load .env early (idempotent if already loaded elsewhere)
-dotenvConfig({ path: resolve(process.cwd(), '.env') });
+// Load + expand .env early (idempotent if already loaded elsewhere)
+const envResult = dotenvConfig({ path: resolve(process.cwd(), '.env') });
+dotenvExpand.expand(envResult);
 
 const EnvSchema = z.object({
   NODE_ENV: z.string().default('development'),
@@ -12,6 +14,7 @@ const EnvSchema = z.object({
   TELEGRAM_API_ID: z.string().optional(),
   TELEGRAM_API_HASH: z.string().optional(),
   WATCH_PATHS: z.string().optional(),
+  WATCH_DIR: z.string().optional(), // legacy / single dir variant
 });
 
 export type RawEnv = z.infer<typeof EnvSchema>;
@@ -29,11 +32,14 @@ export function loadConfig(): AppConfig {
   const wsPort = parsed.BACKEND_WS_PORT ? parseInt(parsed.BACKEND_WS_PORT, 10) : 0;
   const telegramApiId = parsed.TELEGRAM_API_ID ? parseInt(parsed.TELEGRAM_API_ID, 10) : undefined;
   const telegramApiHash = parsed.TELEGRAM_API_HASH;
-  const watchPaths = parsed.WATCH_PATHS
-    ? parsed.WATCH_PATHS.split(',')
-        .map(s => s.trim())
-        .filter(Boolean)
-    : [];
+  let watchPaths: string[] = [];
+  if (parsed.WATCH_PATHS) {
+    watchPaths = parsed.WATCH_PATHS.split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+  } else if (parsed.WATCH_DIR) {
+    watchPaths = [parsed.WATCH_DIR.trim()].filter(Boolean);
+  }
   return {
     env: parsed.NODE_ENV,
     wsPort: Number.isFinite(wsPort) ? wsPort : 0,

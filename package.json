@@ -52,6 +52,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
     "prettier": "^3.6.2",
+    "socket.io-client": "^4.8.1",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2"
   },

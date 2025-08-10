@@ -57,6 +57,9 @@ importers:
       prettier:
         specifier: ^3.6.2
         version: 3.6.2
+      socket.io-client:
+        specifier: ^4.8.1
+        version: 4.8.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       tsx:
         specifier: ^4.20.3
         version: 4.20.3
@@ -78,6 +81,9 @@ importers:
       dotenv:
         specifier: ^17.2.1
         version: 17.2.1
+      dotenv-expand:
+        specifier: ^12.0.2
+        version: 12.0.2
       dotenv-schema:
         specifier: ^0.1.1
         version: 0.1.1
@@ -2255,6 +2261,10 @@ packages:
   dot-prop@5.3.0:
     resolution: {integrity: sha512-QM8q3zDe58hqUqjraQOmzZ1LIH9SWQJTlEKCH4kJ2oQvLZk7RbQXvtDM2XEq3fwkV9CCvvH4LA0AV+ogFsBM2Q==}
     engines: {node: '>=8'}
+
+  dotenv-expand@12.0.2:
+    resolution: {integrity: sha512-lXpXz2ZE1cea1gL4sz2Ipj8y4PiVjytYr3Ij0SWoms1PGxIv7m2CRKuRuCRtHdVuvM/hNJPMxt5PbhboNC4dPQ==}
+    engines: {node: '>=12'}
 
   dotenv-schema@0.1.1:
     resolution: {integrity: sha512-kWNfV4huaBbiLtlXFemghvALLlrTZa7OddngqHSUetN7o1XerTKPVkPEQVRhnYsIjthYeWOJg5of2FHSyNLU7A==}
@@ -7313,6 +7323,10 @@ snapshots:
   dot-prop@5.3.0:
     dependencies:
       is-obj: 2.0.0
+
+  dotenv-expand@12.0.2:
+    dependencies:
+      dotenv: 16.6.1
 
   dotenv-schema@0.1.1: {}
 

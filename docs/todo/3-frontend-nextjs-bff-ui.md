@@ -13,7 +13,7 @@
 - [ ] Создать `/frontend/src/app/api/topics/route.ts`
 - [ ] `/files`, `/folders`, `/sync`, `/download`
 - [ ] Импорт handlers из `backend/src/index.ts`
-- [ ] Адаптеры запрос/ответ, валидация, логирование
+- [x] Адаптеры запрос/ответ, валидация, универсальное логирование (Pino)
 
 ## 3.3. WebSocket клиент
 

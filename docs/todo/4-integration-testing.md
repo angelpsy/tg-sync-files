@@ -26,8 +26,17 @@
 
 ## 4.4. Мониторинг и логирование
 
-- [ ] Настроить Winston/Pino, уровни логирования, ErrorHandler, Sentry
+- [x] Настроить Pino (универсальный логгер), уровни логирования per-service,
+      ErrorHandler
+  - [x] Поддержка Node.js и Browser environments
+  - [x] Per-service configuration через ENV переменные (LOG_LEVEL_FS,
+        LOG_LEVEL_TELEGRAM, etc.)
+  - [x] Structured JSON logging с красивым development форматом
 - [ ] Собрать метрики и логи:
   - [ ] Время выполнения запросов
   - [ ] Потребление памяти и CPU
   - [ ] Логи WebSocket событий
+- [ ] Расширить логгер дополнительными транспортами:
+  - [ ] File transport для production (через Pino ecosystem)
+  - [ ] Remote logging для браузера (отправка на backend)
+  - [ ] Metrics collection (интеграция с Prometheus/OpenTelemetry)

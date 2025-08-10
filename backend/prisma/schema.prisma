@@ -11,33 +11,99 @@ datasource db {
 }
 
 // Telegram channel configuration
-model TelegramChannel {
-  id        String   @id @default(cuid())
-  channelId String   @unique
+model Channel {
+  id        String   @id
   name      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  fileSyncEvents FileSyncEvent[]
+  topics            Topic[]
+  fileSyncEvents    FileSyncEvent[]
 
-  @@map("telegram_channels")
+  @@map("channels")
+}
+
+// Topics within channels
+model Topic {
+  id        String   @id
+  name      String
+  channelId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  channel           Channel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  folderTopicLinks  FolderTopicLink[]
+  uploadSessions    UploadSession[]
+
+  @@map("topics")
+}
+
+// Folder-Topic links
+model FolderTopicLink {
+  id         String   @id @default(cuid())
+  folderPath String
+  topicId    String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([folderPath, topicId])
+  @@map("folder_topic_links")
+}
+
+// Upload sessions tracking
+model UploadSession {
+  id            String       @id @default(cuid())
+  folderPath    String
+  topicId       String
+  status        UploadStatus @default(PENDING)
+  totalFiles    Int
+  uploadedFiles Int          @default(0)
+  currentFile   String?
+  progress      Float        @default(0)
+  startedAt     DateTime
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  completedAt   DateTime?
+  error         String?
+
+  // Relations
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@map("upload_sessions")
+}
+
+// Telegram session data
+model TelegramSession {
+  id            String   @id @default(cuid())
+  stringSession String   @db.Text
+  phoneNumber   String
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("telegram_sessions")
 }
 
 // File sync events tracking
 model FileSyncEvent {
-  id        String    @id @default(cuid())
+  id        String     @id @default(cuid())
   fileName  String
   filePath  String
   channelId String
   status    SyncStatus @default(PENDING)
   error     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   // Relations
-  channel TelegramChannel @relation(fields: [channelId], references: [channelId])
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@map("file_sync_events")
 }
@@ -48,4 +114,13 @@ enum SyncStatus {
   SYNCING
   COMPLETED
   ERROR
+}
+
+// Enum for upload status
+enum UploadStatus {
+  PENDING
+  UPLOADING
+  PAUSED
+  COMPLETED
+  FAILED
 }

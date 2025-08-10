@@ -1,13 +1,15 @@
 'use client';
 
-import type { FileSyncEvent, WSMessage } from '@/types';
+import type { IFileSyncEvent, IWSMessage } from '@/types';
 import { useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { io } from 'socket.io-client';
 
+import { serviceLoggers } from '../../shared/logger';
+
 export default function HomePage() {
   const [, setSocket] = useState<Socket | null>(null);
-  const [syncEvents, setSyncEvents] = useState<FileSyncEvent[]>([]);
+  const [syncEvents, setSyncEvents] = useState<IFileSyncEvent[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<
     'connecting' | 'connected' | 'disconnected'
   >('disconnected');
@@ -16,7 +18,7 @@ export default function HomePage() {
     const wsEndpoint = process.env.NEXT_PUBLIC_WS_ENDPOINT;
 
     if (!wsEndpoint) {
-      console.error('NEXT_PUBLIC_WS_ENDPOINT environment variable is not defined');
+      serviceLoggers.socket.error('NEXT_PUBLIC_WS_ENDPOINT environment variable is not defined');
       setConnectionStatus('disconnected');
       return;
     }
@@ -24,17 +26,17 @@ export default function HomePage() {
     const newSocket = io(wsEndpoint);
 
     newSocket.on('connect', () => {
-      console.log('Connected to WebSocket server');
+      serviceLoggers.socket.info('Connected to WebSocket server');
       setConnectionStatus('connected');
     });
 
     newSocket.on('disconnect', () => {
-      console.log('Disconnected from WebSocket server');
+      serviceLoggers.socket.info('Disconnected from WebSocket server');
       setConnectionStatus('disconnected');
     });
 
-    newSocket.on('message', (message: WSMessage) => {
-      console.log('Received message:', message);
+    newSocket.on('message', (message: IWSMessage) => {
+      serviceLoggers.socket.debug('Received message', { messageType: message.type });
 
       if (
         message.type === 'file_sync_start' ||
@@ -42,7 +44,7 @@ export default function HomePage() {
         message.type === 'file_sync_complete' ||
         message.type === 'file_sync_error'
       ) {
-        setSyncEvents(prev => [...prev, message.payload as FileSyncEvent]);
+        setSyncEvents(prev => [...prev, message.payload as IFileSyncEvent]);
       }
     });
 

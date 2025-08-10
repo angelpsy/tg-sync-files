@@ -39,6 +39,8 @@
     "install:all": "pnpm install --frozen-lockfile"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
     "@typescript-eslint/eslint-plugin": "^8.39.0",
     "@typescript-eslint/parser": "^8.39.0",
     "eslint": "^8.57.1",
@@ -47,12 +49,10 @@
     "eslint-plugin-import": "^2.29.0",
     "eslint-plugin-react": "^7.34.0",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "prettier": "^3.6.2",
-    "typescript": "^5.4.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
-    "@commitlint/cli": "^19.8.1",
-    "@commitlint/config-conventional": "^19.8.1"
+    "prettier": "^3.6.2",
+    "typescript": "^5.4.0"
   },
   "lint-staged": {
     "*.{js,ts,tsx}": [
@@ -62,5 +62,9 @@
     "*.{json,md,yml,yaml}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "pino": "^9.8.0",
+    "pino-pretty": "^13.1.1"
   }
 }

@@ -1,57 +1,8 @@
 // Shared types for Telegram FileSync project
+// Organized by domain areas following DDD principles
 
-/**
- * Telegram channel configuration
- */
-export interface TelegramChannel {
-  id: string;
-  name: string;
-  isActive: boolean;
-}
-
-/**
- * File sync status
- */
-export type SyncStatus = 'pending' | 'syncing' | 'completed' | 'error';
-
-/**
- * File sync event payload
- */
-export interface FileSyncEvent {
-  id: string;
-  fileName: string;
-  filePath: string;
-  channelId: string;
-  status: SyncStatus;
-  timestamp: Date;
-  error?: string;
-}
-
-/**
- * WebSocket message types
- */
-export type WSMessageType =
-  | 'file_sync_start'
-  | 'file_sync_progress'
-  | 'file_sync_complete'
-  | 'file_sync_error'
-  | 'channel_status_update';
-
-/**
- * WebSocket message structure
- */
-export interface WSMessage<T = unknown> {
-  type: WSMessageType;
-  payload: T;
-  timestamp: number;
-}
-
-/**
- * API Response wrapper
- */
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  timestamp: number;
-}
+// Domain exports
+export * from './common/index.js';
+export * from './file-sync/index.js';
+export * from './telegram/index.js';
+export * from './websocket/index.js';

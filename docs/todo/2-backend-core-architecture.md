@@ -289,14 +289,22 @@ restore при reconnect клиента)
   закрываем существующие после отправки финальных сообщений.
 - Метрики интегрировать с `SchedulerService` (периодический лог snapshot).
 
-## 2.7. Backend API и интеграция
+## 2.7. Backend API и интеграция (упрощено)
 
-- [ ] ~~BFF handlers в backend~~ Создать типизированные API контракты в
-      `/types/api.ts`
-- [ ] Создать `/backend/src/core/ServiceRegistry.ts` для управления
-      зависимостями
-- [ ] Интерфейс `IBackendServices.ts` для экспорта сервисов в frontend
-- [ ] REST API endpoints через WebSocket для frontend (command pattern)
+Решение: для MVP используем только WebSocket (command + events). Отдельный REST
+слой исключён.
+
+Out of scope сейчас:
+
+- REST / BFF endpoints
+- OpenAPI спецификация (перенесено до появления внешнего API)
+
+Оставшиеся потенциальные задачи (позже, если потребуется):
+
+- [ ] ServiceRegistry (объединение сервисов для фронтенда через один snapshot по
+      WS)
+- [ ] IBackendServices.ts (типизированная агрегация для SDK генерации в будущем)
+- [ ] metrics / health (возможный лёгкий HTTP позже, но не часть текущего плана)
 
 ## 2.8. Композиция приложения
 

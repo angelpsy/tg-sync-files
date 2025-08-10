@@ -108,26 +108,186 @@
 
 ## 2.5. SyncService
 
-- [ ] Создать `/backend/src/core/services/SyncService.ts`
-- [ ] In-memory статус загрузки
-- [ ] Методы: `uploadFolderToTopic`, `checkDuplicates`, `getUploadStatus`
-- [ ] Определить максимальное число параллельных загрузок и политику блокировок
+- [x] Создать `/backend/src/core/services/SyncService.ts`
+- [x] In-memory статус загрузок (Map sessionId -> session)
+- [x] Методы: `uploadFolderToTopic`, `startUpload`, `pauseUpload`,
+      `resumeUpload`, `cancelUpload`, `getUploadProgress`, `getUploadResult`,
+      `checkDuplicates`
+- [x] Локальная и удалённая (через `listTopicFiles`) проверка дубликатов (по
+      имени файла)
+- [x] Skip уже существующих в топике файлов (имя совпадает) – учитываются как
+      загруженные
+- [x] Ограничение параллелизма: `maxParallelUploads = 1` (расширяемо)
+- [x] Периодическая персистенция сессий через `SchedulerService.scheduleTask`
+      (отказ от внутреннего setInterval)
+- [x] Оптимизация персистенции: сохраняются только изменённые сессии
+      (`updatedAt` > lastPersisted)
+- [x] Авто-отмена задачи персистенции при отсутствии активных сессий
+- [x] Инкрементальный `syncFolder` (MVP: новые локальные файлы по имени →
+      догрузка; без удалений / обновлений / рекурсий) Ограничения: нет
+      рекурсивного обхода, нет выявления обновлённых/удалённых, linkId временно
+      трактуется как topicId.
+- [x] Расширенная семантика статусов: добавлено поле `hasFailures` в
+      UploadResult (COMPLETED + hasFailures=true при частичных сбоях, FAILED
+      только если 0 успешных)
+- [x] WebSocket события прогресса (минимальная интеграция через
+      `emitUploadProgress` при старте/каждом файле/финале)
+- [x] Graceful shutdown: метод shutdown() (flush + cancel persistence)
+      реализован в SyncService
+- [ ] Конфигурируемый `maxParallelUploads` > 1 (очередь + ограничитель) – TODO
+
+## 2.5.1. Roadmap этапы (последовательность реализации)
+
+1. Инкрементальный syncFolder (diff локальных/удалённых файлов)
+   - [x] Плоский уровень выбранной папки
+   - [x] new / updated / removed / unchanged классификация по size+mtime
+   - [x] remoteOnlyFiles (файлы есть в Telegram, нет локально и в records)
+   - [x] Hash-refinement: если hash совпал – file переклассифицируется из
+         updated в unchanged
+2. Расширенная семантика статусов (hasFailures) – выполнено (будет заменено
+   PARTIAL статусом).
+3. WebSocket события
+   - [x] upload_start / upload_progress / upload_complete / upload_error
+   - [x] file-level: uploaded | skipped | renamed | failed (с reason)
+   - [x] sync_diff (включая remoteOnlyFiles)
+   - [ ] upload_partial (будет после ввода статуса PARTIAL)
+4. Graceful shutdown (SyncService) – выполнено (глобальная интеграция позже).
+5. Fingerprint (mtime+size → hash опционально)
+   - [x] quick fingerprint + FileRecord upsert
+   - [x] hash стратегия подключена
+6. Политика конфликтов имён (skip | rename | log_only) – выполнено + счётчики.
+7. Hash стратегия (none | on_demand | eager) – выполнено.
+8. PARTIAL статус
+   - [x] Добавлен EUploadStatus.PARTIAL (domain + DB enum + маппинги)
+   - [x] Логика присвоения: есть и удовлетворённые (uploaded/ skipped) и ошибки
+         → PARTIAL
+   - [x] UploadResult.status теперь PARTIAL вместо COMPLETED+hasFailures
+   - [x] hasFailures помечен как deprecated (обратная совместимость)
+   - [ ] Обновить consumer-код frontend на использование status === 'partial'
+
+### 2.5.2. Post-MVP хвосты SyncService
+
+Must have:
+
+1. Prisma enum обновить (PARTIAL) + миграция.
+2. Persist новых полей UploadSession / UploadResult (realUploaded, skipped,
+   conflicts\*, status PARTIAL) в StorageService (и схема, если нужно) – или
+   явно зафиксировать, что они вычисляются только in-memory.
+3. Очистка завершённых сессий из памяти (LRU / TTL, напр. >24h) чтобы не расти
+   бесконечно.
+4. Удалить устаревшие TODO в конце `SyncService.ts` (часть уже реализована).
+5. Конфигурируемый `maxParallelUploads` > 1: очередь + ограничение
+   параллельности.
+6. Retry / backoff на уровне SyncService для uploadFile (если TelegramService не
+   гарантирует внутренние ретраи) с лимитом попыток и классификацией ошибок.
+7. Тесты (unit):
+   - buildFingerprint/hash strategies
+   - conflict rename генерация
+   - skip unchanged (fingerprint + hash refinement)
+   - статусная логика (COMPLETED / PARTIAL / FAILED edge cases)
+
+Nice to have: 8. Разделить skipped на `skippedRemoteDuplicates` и
+`skippedUnchanged` в метриках и результатах. 9. Добавить `conflictsTotal`
+(агрегация) и, возможно, `renamedFiles[]` список. 10. Hash-based rename
+detection (обнаружение переименований: hash совпал, имя новое → классифицировать
+отдельно вместо removed+new). 11. Политика для `remoteOnlyFiles` (отдельный
+enum: IGNORE | LOG | DELETE_REMOTE) – сейчас только выдаём в diff. 12. TTL /
+size ограничение для `fingerprintCache` (например max entries или max MB) +
+периодическая очистка. 13. Расширить upload_complete payload: средняя скорость,
+длительность по файлам (если будем собирать). 14. API для получения списка
+активных / недавних сессий (`listSessions(): IUploadResult[] | summaries`). 15.
+Восстановление незавершённых сессий при старте (read persisted sessions →
+рестарт только PENDING/UPLOADING → перевод в FAILED/ PARTIAL?). 16. Более
+детализированные логи конфликтов (structured: {policy, action, originalName,
+finalName}). 17. Метрика распределения причин ошибок (network / telegram_rate /
+size_limit ...). 18. Возможность аварийного прерывания текущего файла (graceful
+abort) при cancel. 19. Опциональная проверка свободного места / ограничений
+перед стартом (preflight). 20. CLI / административный метод для принудительной
+очистки старых FileRecord для неиспользуемых топиков.
+
+Deferred / возможно позже: 21. Batch upsert FileRecord (снизить I/O) – копить и
+писать пачками. 22. Переход на потоковую загрузку с мониторингом скорости (если
+Telegram API позволит) для нюансной оценки ETA. 23. Статистика по хэшу:
+выявление дубликатов с разными именами в одном топике (dedupe report).
 
 ## 2.6. WebSocket слой
 
-- [x] ~~Создать Socket.IO сервер~~ Базовая реализация уже есть в
-      `/backend/src/ws-server.ts`
-- [ ] Рефакторинг `/backend/src/infrastructure/ws/SocketService.ts`:
-  - [ ] Выделить SocketService из ws-server.ts
-  - [ ] Типизированные события вместо generic strings
-  - [ ] Proper error handling и reconnection logic
-- [ ] Стандартизовать WebSocket события:
-  - `file_sync_start`, `file_sync_progress`, `file_sync_complete`,
-    `file_sync_error`
-  - `upload_start`, `upload_progress`, `upload_complete`, `upload_error`
-  - `download_start`, `download_progress`, `download_complete`, `download_error`
-  - `folder_tree_update`, `channel_status_update`
-- [ ] Добавить middleware для аутентификации и rate limiting
+Ограничения MVP (приняты):
+
+- Нет аутентификации / авторизации (deferred)
+- Нет rooms / namespaces (deferred)
+- Нет тестов на данном этапе (будут позже общим пакетом)
+
+### 2.6.1. Состояние
+
+- [x] Базовый Socket.IO сервер (создание/инициализация)
+- [x] Минимальные доменные emit\* методы (upload_progress, sync_diff и т.д.)
+
+### 2.6.2. MVP Must Have (реализовать в ближайших итерациях)
+
+1. [ ] Реестр событий: `EventNames` + `EventPayloadMap` в
+       `/types/websocket/events.ts` (исключить "магические" строки)
+2. [ ] Единую форму сообщения `IWSMessage` дополнить полем `protocolVersion`
+       (константа `WS_PROTOCOL_VERSION = 1`)
+3. [ ] Generic `emit(event: EventName, payload)` внутри `SocketService`;
+       существующие `emitUploadProgress` и пр. либо тонкие врапперы, либо
+       перенос в отдельный publisher-адаптер
+4. [ ] Валидация входящих сообщений (если используем двусторонние сообщения)
+       через zod-схемы из реестра (`validateIncomingMessage`)
+5. [ ] Методы отписки: `offConnection`, `offDisconnection`, `offMessage`,
+       `offClientConnect`
+6. [ ] Хранить обработчики в `Set` вместо массивов (устранение дубликатов,
+       облегчение off)
+7. [ ] Минимальные метрики в памяти: `activeConnections`, `messagesIn`,
+       `messagesOut`, `errors`, `rateLimitDrops`
+8. [ ] Метод
+       `getStats(): { connections, messagesIn, messagesOut, startedAt, uptimeMs }`
+9. [ ] Rate limiting: простое скользящее окно (например 50 сообщений / 5s на
+       сокет), при превышении: warn + счётчик нарушений, после 3 нарушений —
+       disconnect
+10. [ ] Error handling: ловить `connection_error`, `socket.on('error')`,
+        try/catch внутри диспетчеризации messageHandlers
+11. [ ] Graceful shutdown улучшить: state `draining=true` (middleware отклоняет
+        новые соединения), очистка всех Set обработчиков, лог финальных метрик
+12. [ ] Пределы безопасности: `maxHttpBufferSize` (например 1_000_000), защита
+        от слишком большого payload (валидация размера до парсинга)
+13. [ ] Skip пустых broadcast: если `activeConnections === 0` не сериализовать
+        payload
+14. [ ] Консистентные имена событий (переход на стандартизованный список ниже)
+
+### 2.6.3. Стандартизованные имена событий (MVP)
+
+- file_sync_start / file_sync_progress / file_sync_complete / file_sync_error
+- upload_start / upload_progress / upload_complete / upload_error /
+  upload_file_event
+- sync_diff
+- folder_tree_update
+- channel_status_update
+
+### 2.6.4. Post-MVP (после стабилизации базового функционала)
+
+A. [ ] Heartbeat watchdog поверх встроенного ping (доп. таймаут неактивности) B.
+[ ] Correlation / trace id в `IWSMessage` (передача цепочки) C. [ ]
+Acknowledgements (поддержка callback ack для критичных операций) D. [ ]
+Backpressure очередь (ограничение объёма исходящих сообщений, drop/pause) E. [ ]
+Экспорт метрик (Prometheus /metrics адаптер) F. [ ] Rooms / namespaces (deferred
+явно) G. [ ] Auth middleware (JWT / токен) — deferred H. [ ] Пер-событийная
+латентность (timestamping + расчёт p95) I. [ ] Correlated reconnect logic (state
+restore при reconnect клиента)
+
+### 2.6.5. Не будет (Out of scope сейчас)
+
+- Полноценная авторизация ролей
+- Мультиплексированные каналы / сложная маршрутизация
+- Расширенные тесты производительности (позже)
+
+### 2.6.6. Примечания по реализации
+
+- Реестр событий позволит статически типизировать `emit` и `onMessage`.
+- Rate limiter можно реализовать кольцевым буфером timestamps на сокет.
+- Graceful drain: перед shutdown помечаем draining, отклоняем новые connection,
+  закрываем существующие после отправки финальных сообщений.
+- Метрики интегрировать с `SchedulerService` (периодический лог snapshot).
 
 ## 2.7. Backend API и интеграция
 

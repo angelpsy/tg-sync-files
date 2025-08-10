@@ -1,5 +1,7 @@
-import { serviceLoggers } from '../../../../shared/logger.js';
+// External / shared
+import { serviceLoggers } from '../../../../shared/logger';
 
+// Types
 import type { IFSService, ISchedulerService, IStorageService } from '@/types';
 
 /**
@@ -200,6 +202,22 @@ export class SchedulerService implements ISchedulerService {
   }
 
   /**
+   * Schedules a generic task
+   */
+  scheduleTask(id: string, name: string, intervalMs: number, execute: () => Promise<void>): void {
+    const task: ScheduledTask = {
+      id,
+      name,
+      intervalMs,
+      isRunning: false,
+      execute,
+    };
+    this.tasks.set(id, task);
+    if (this.isStarted) this.startTask(task);
+    this.logger.info('Scheduled generic task', { id, intervalMs });
+  }
+
+  /**
    * Gets information about all tasks
    */
   getTasksInfo(): Array<Omit<ScheduledTask, 'timer' | 'execute'>> {
@@ -218,20 +236,15 @@ export class SchedulerService implements ISchedulerService {
    */
   cancelTask(taskId: string): boolean {
     const task = this.tasks.get(taskId);
-    if (!task) {
-      this.logger.warn('Task not found', { taskId });
-      return false;
-    }
-
+    if (!task) return false;
     this.stopTask(task);
     this.tasks.delete(taskId);
-
-    this.logger.info('Task cancelled', { taskId, taskName: task.name });
+    this.logger.info('Cancelled task', { taskId });
     return true;
   }
 
   /**
-   * Запускает конкретную задачу
+   * Starts a specific task
    */
   private startTask(task: ScheduledTask): void {
     if (task.timer) {
@@ -306,84 +319,12 @@ export class SchedulerService implements ISchedulerService {
    * Выполняет задачу по ID
    */
   private async executeTaskById(taskId: string): Promise<void> {
-    switch (taskId) {
-      case 'file-scan':
-        await this.executeFileScanTask();
-        break;
-
-      case 'cleanup':
-        await this.executeCleanupTask();
-        break;
-
-      case 'session-check':
-        await this.executeSessionCheckTask();
-        break;
-
-      default:
-        throw new Error(`Unknown task ID: ${taskId}`);
-    }
-  }
-
-  /**
-   * Выполняет задачу сканирования файловой системы
-   */
-  private async executeFileScanTask(): Promise<void> {
-    this.logger.debug('Executing file scan task');
-
-    try {
-      await this.fsService.forceScan();
-      this.logger.debug('File scan task completed');
-    } catch (error) {
-      this.logger.error('File scan task failed', { error });
-      throw error;
-    }
-  }
-
-  /**
-   * Выполняет задачу очистки временных файлов
-   */
-  private async executeCleanupTask(): Promise<void> {
-    this.logger.debug('Executing cleanup task');
-
-    try {
-      // TODO: Реализовать логику очистки временных файлов
-      // - Удаление старых логов
-      // - Очистка кэша
-      // - Удаление незавершенных загрузок
-
-      this.logger.debug('Cleanup task completed (placeholder)');
-    } catch (error) {
-      this.logger.error('Cleanup task failed', { error });
-      throw error;
-    }
-  }
-
-  /**
-   * Выполняет задачу проверки Telegram сессии
-   */
-  private async executeSessionCheckTask(): Promise<void> {
-    this.logger.debug('Executing session check task');
-
-    try {
-      const session = await this.storageService.getTelegramSession();
-
-      if (!session) {
-        this.logger.warn('No Telegram session found');
-        return;
-      }
-
-      // TODO: Реализовать проверку активности сессии
-      // - Проверка валидности stringSession
-      // - Попытка подключения к Telegram
-      // - Обновление статуса в БД
-
-      this.logger.debug('Session check task completed (placeholder)', {
-        sessionId: session.id,
-        isActive: session.isActive,
-      });
-    } catch (error) {
-      this.logger.error('Session check task failed', { error });
-      throw error;
+    const task = this.tasks.get(taskId);
+    if (!task) throw new Error(`Unknown task ID: ${taskId}`);
+    // Prefer per-task execute (generic)
+    if (task.execute) {
+      await task.execute();
+      return;
     }
   }
 }

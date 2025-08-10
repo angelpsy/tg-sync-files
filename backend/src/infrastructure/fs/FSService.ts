@@ -3,7 +3,7 @@ import { join, relative } from 'path';
 
 import chokidar from 'chokidar';
 
-import { serviceLoggers } from '../../../../shared/logger.js';
+import { serviceLoggers } from '../../../../shared/logger';
 
 import type { IFileChangeEvent, IFileInfo, IFolderTree, IFSService } from '@/types';
 

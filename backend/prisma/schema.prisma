@@ -37,6 +37,7 @@ model Topic {
   channel           Channel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
   folderTopicLinks  FolderTopicLink[]
   uploadSessions    UploadSession[]
+  fileRecords       FileRecord[]
 
   @@map("topics")
 }
@@ -72,6 +73,12 @@ model UploadSession {
   updatedAt     DateTime     @updatedAt
   completedAt   DateTime?
   error         String?
+  // Extended metrics (optional)
+  realUploadedFiles Int?      @default(0)
+  skippedFilesCount Int?      @default(0)
+  conflictsSkipped   Int?      @default(0)
+  conflictsRenamed   Int?      @default(0)
+  conflictsLogged    Int?      @default(0)
 
   // Relations
   topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
@@ -108,6 +115,25 @@ model FileSyncEvent {
   @@map("file_sync_events")
 }
 
+// File records (uploaded files metadata per topic)
+model FileRecord {
+  id         String   @id @default(cuid())
+  topicId    String
+  folderPath String
+  fileName   String
+  size       Int
+  mtimeMs    BigInt
+  hash       String?  @db.Text
+  uploadedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, fileName])
+  @@map("file_records")
+}
+
 // Enum for sync status
 enum SyncStatus {
   PENDING
@@ -122,5 +148,6 @@ enum UploadStatus {
   UPLOADING
   PAUSED
   COMPLETED
+  PARTIAL
   FAILED
 }

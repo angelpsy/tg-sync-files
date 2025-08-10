@@ -75,15 +75,36 @@ export interface IFolderTree {
 
 /**
  * Upload result
+ * uploadedFiles: count of files that ended in a satisfied state for the session (either really uploaded or skipped as already present / unchanged)
+ * failedFiles: list of file names that definitively failed to upload after all retries
+ * hasFailures: true when at least one file failed while at least one succeeded or was satisfied
  */
 export interface IUploadResult {
   uploadId: string;
+  /** Final high-level session status (COMPLETED | PARTIAL | FAILED etc.) */
   status: TUploadStatus;
+  /** Total number of files discovered at session start */
   totalFiles: number;
+  /** Number of files successfully uploaded OR skipped as satisfied (duplicate / unchanged) */
   uploadedFiles: number;
+  /** Number of files actually transferred to Telegram (excludes skips) */
+  realUploadedFiles?: number;
+  /** Number of files skipped as already satisfied (remote duplicate / unchanged) */
+  skippedFilesCount?: number;
+  /** File names that failed to upload */
   failedFiles: string[];
+  /** Session start time */
   startedAt: Date;
+  /** Session completion time (set when status becomes COMPLETED, PARTIAL or FAILED) */
   completedAt?: Date;
+  /** @deprecated use status === 'partial' instead; retained for backward compatibility */
+  hasFailures?: boolean;
+  /** Count of conflicts resolved by skipping (policy=SKIP) */
+  conflictsSkipped?: number;
+  /** Count of conflicts resolved by renaming (policy=RENAME) */
+  conflictsRenamed?: number;
+  /** Count of conflicts only logged (policy=LOG_ONLY) */
+  conflictsLogged?: number;
 }
 
 /**
@@ -121,21 +142,44 @@ export interface IFolderTopicLink {
 }
 
 /**
- * Upload session
+ * Upload session (in-flight state held in memory)
+ * NOTE: This interface does NOT expose internal tracking properties like failedFiles or conflictPolicy used internally by SyncService.
+ * - uploadedFiles counts both actually uploaded and logically satisfied (skipped duplicate / unchanged) files.
+ * - progress is derived from uploadedFiles / totalFiles (0..100 integer percentage).
  */
 export interface IUploadSession {
+  /** Session identifier */
   id: string;
+  /** Local folder path being uploaded */
   folderPath: string;
+  /** Target topic id in Telegram */
   topicId: string;
+  /** Current session status */
   status: TUploadStatus;
+  /** Total files determined at the start (flat scan, no recursion) */
   totalFiles: number;
+  /** Count of files uploaded OR skipped as satisfied */
   uploadedFiles: number;
+  /** Name of file currently being processed (upload attempt) */
   currentFile?: string;
+  /** Percentage (integer 0..100) = Math.round(uploadedFiles / totalFiles * 100) */
   progress: number;
+  /** Timestamp when session started */
   startedAt: Date;
+  /** Last mutation timestamp (any state change) */
   updatedAt: Date;
+  /** Completion timestamp when finished or failed */
   completedAt?: Date;
+  /** Error message if session failed or was cancelled */
   error?: string;
+  /** Count of actually transferred files (excludes skips) */
+  realUploadedFiles?: number;
+  /** Count of logically satisfied skipped files (remote duplicate / unchanged) */
+  skippedFilesCount?: number;
+  /** Conflict metrics */
+  conflictsSkipped?: number;
+  conflictsRenamed?: number;
+  conflictsLogged?: number;
 }
 
 /**
@@ -178,4 +222,100 @@ export interface IFileChangeEvent {
     size?: number;
     hash?: string;
   };
+}
+
+/**
+ * File fingerprint information
+ */
+export interface IFileFingerprint {
+  size: number;
+  mtimeMs: number;
+  hash?: string; // sha256 optional
+}
+
+/**
+ * File record information
+ */
+export interface IFileRecord {
+  id: string; // composite or uuid
+  folderPath: string;
+  topicId: string;
+  fileName: string;
+  size: number;
+  mtimeMs: number;
+  hash?: string;
+  uploadedAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Upload lifecycle start event payload
+ */
+export interface IUploadStartEvent {
+  uploadId: string;
+  folderPath: string;
+  topicId: string;
+  totalFiles: number;
+  timestamp: number;
+}
+
+/**
+ * Upload lifecycle completion event payload
+ */
+export interface IUploadCompleteEvent {
+  uploadId: string;
+  topicId: string;
+  totalFiles: number;
+  uploadedFiles: number; // satisfied count
+  failedFiles: number;
+  hasFailures: boolean;
+  durationMs: number;
+  timestamp: number;
+  realUploadedFiles?: number;
+  skippedFilesCount?: number;
+  conflictsSkipped?: number;
+  conflictsRenamed?: number;
+  conflictsLogged?: number;
+}
+
+/**
+ * Upload lifecycle error event payload
+ */
+export interface IUploadErrorEvent {
+  uploadId: string;
+  topicId: string;
+  error: string;
+  timestamp: number;
+}
+
+/**
+ * File-level upload event (per file action)
+ * action: uploaded | skipped | renamed | failed
+ * reason: remote_duplicate | unchanged | conflict | error
+ */
+export interface IUploadFileEvent {
+  uploadId: string;
+  topicId: string;
+  fileName: string;
+  originalName?: string; // for renamed
+  action: 'uploaded' | 'skipped' | 'renamed' | 'failed';
+  reason?: 'remote_duplicate' | 'unchanged' | 'conflict' | 'error';
+  index: number; // 1-based satisfied/processed index after this action
+  totalFiles: number;
+  error?: string;
+  timestamp: number;
+}
+
+/**
+ * Result of incremental diff calculation
+ */
+export interface ISyncDiffResult {
+  topicId: string;
+  folderPath: string;
+  newFiles: string[]; // not in records nor remote
+  updatedFiles: string[]; // present but fingerprint (size/mtime or hash) changed
+  removedFiles: string[]; // exist in records but not locally (UI highlight only)
+  unchangedFiles: string[]; // satisfied
+  remoteOnlyFiles?: string[]; // exist remotely but not locally nor in records (orphan remote)
+  timestamp: number;
 }

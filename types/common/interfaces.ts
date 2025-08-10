@@ -2,7 +2,7 @@
  * Common domain interfaces
  */
 
-import type { IFolderTopicLink, IUploadSession } from '../file-sync/index.js';
+import type { IFileRecord, IFolderTopicLink, IUploadSession } from '../file-sync/index.js';
 import type { ITelegramChannel, ITelegramSession } from '../telegram/index.js';
 
 /**
@@ -49,6 +49,21 @@ export interface IStorageService {
    * Saves Telegram session
    */
   saveTelegramSession(session: ITelegramSession): Promise<void>;
+
+  /**
+   * Gets file record by topic and name
+   */
+  getFileRecord(topicId: string, fileName: string): Promise<IFileRecord | null>;
+
+  /**
+   * Upserts file record
+   */
+  upsertFileRecord(record: IFileRecord): Promise<void>;
+
+  /**
+   * Lists file records for a topic
+   */
+  getTopicFileRecords(topicId: string): Promise<IFileRecord[]>;
 }
 
 /**
@@ -105,4 +120,14 @@ export interface ISchedulerService {
    * Schedules Telegram session status check
    */
   scheduleSessionCheck(intervalMs: number): void;
+
+  /**
+   * Registers a generic periodic task
+   */
+  scheduleTask(id: string, name: string, intervalMs: number, execute: () => Promise<void>): void;
+
+  /**
+   * Cancels task by id
+   */
+  cancelTask(taskId: string): boolean;
 }

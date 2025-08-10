@@ -2,10 +2,12 @@
  * File sync domain interfaces
  */
 
+import type { TFileHashStrategy, TUploadConflictPolicy } from './enums.js';
 import type {
   IFileChangeEvent,
   IFileInfo,
   IFolderTree,
+  ISyncDiffResult,
   IUploadProgress,
   IUploadResult,
   IUploadSession,
@@ -77,14 +79,23 @@ export interface IFSService {
  */
 export interface ISyncService {
   /**
-   * Uploads folder to topic
+   * Uploads folder to topic (sequential respecting maxParallelUploads)
    */
-  uploadFolderToTopic(folderPath: string, topicName: string): Promise<IUploadResult>;
+  uploadFolderToTopic(
+    folderPath: string,
+    channelId: string,
+    topicId: string
+  ): Promise<IUploadResult>;
 
   /**
-   * Starts upload session
+   * Starts upload session (deferred execution / streaming progress)
    */
-  startUpload(folderPath: string, topicId: string): Promise<IUploadSession>;
+  startUpload(
+    folderPath: string,
+    channelId: string,
+    topicId: string,
+    opts?: { conflictPolicy?: TUploadConflictPolicy; hashStrategy?: TFileHashStrategy }
+  ): Promise<IUploadSession>;
 
   /**
    * Pauses upload session
@@ -112,12 +123,17 @@ export interface ISyncService {
   getUploadResult(sessionId: string): Promise<IUploadResult>;
 
   /**
-   * Synchronizes folder with topic
+   * Synchronizes folder with topic (incremental)
    */
-  syncFolder(linkId: string): Promise<void>;
+  syncFolder(linkId: string): Promise<ISyncDiffResult>;
 
   /**
-   * Checks for duplicate files
+   * Checks for duplicate files inside a topic by file name
    */
-  checkDuplicates(folderPath: string, topicName: string): Promise<boolean>;
+  checkDuplicates(folderPath: string, channelId: string, topicId: string): Promise<boolean>;
+
+  /**
+   * Graceful shutdown: flush persistence and cleanup resources
+   */
+  shutdown(): Promise<void>;
 }

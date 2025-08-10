@@ -2,7 +2,15 @@
  * WebSocket domain interfaces
  */
 
-import type { IFileSyncEvent, IUploadProgress } from '../file-sync/index.js';
+import type {
+  IFileSyncEvent,
+  ISyncDiffResult,
+  IUploadCompleteEvent,
+  IUploadErrorEvent,
+  IUploadFileEvent,
+  IUploadProgress,
+  IUploadStartEvent,
+} from '../file-sync/index.js';
 import type { IChannelStatus } from '../telegram/index.js';
 
 import type { IWSConnectionInfo, IWSMessage } from './models.js';
@@ -58,6 +66,13 @@ export interface ISocketService {
    * Emits channel status
    */
   emitChannelStatus(status: IChannelStatus): void;
+
+  /** Upload lifecycle events */
+  emitUploadStart(event: IUploadStartEvent): void;
+  emitUploadComplete(event: IUploadCompleteEvent): void;
+  emitUploadError(event: IUploadErrorEvent): void;
+  emitUploadFileEvent(event: IUploadFileEvent): void;
+  emitSyncDiff(diff: ISyncDiffResult): void;
 
   /**
    * Subscribes to client connections

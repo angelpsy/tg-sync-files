@@ -47,6 +47,14 @@ export interface ITelegramService {
   uploadFile(file: IFileInfo, topicId: string, channelId: string): Promise<void>;
 
   /**
+   * Lists files (documents) inside a forum topic
+   */
+  listTopicFiles(
+    channelId: string,
+    topicId: string
+  ): Promise<Array<{ id: string; name?: string; size?: number; mimeType?: string }>>;
+
+  /**
    * Downloads files from topic
    */
   downloadFiles(

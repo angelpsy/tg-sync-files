@@ -2,12 +2,15 @@
   "name": "@tg-sync-files/backend",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
-  "main": "dist/index.js",
+  "type": "commonjs",
+  "main": "dist/backend/src/index.js",
   "scripts": {
-    "dev": "tsx watch src/ws-server.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "dev": "vite",
+    "dev:ws": "tsx watch src/ws-server.ts",
+    "build:tsc": "tsc",
+    "build": "vite build",
+    "start": "node dist-vite/index.mjs",
+    "start:legacy": "node dist/backend/src/index.js",
     "start:ws": "node dist/ws-server.js",
     "typecheck": "tsc --noEmit",
     "prisma:db:push": "prisma db push",
@@ -40,6 +43,8 @@
     "prisma": "^6.13.0",
     "ts-jest": "^29.4.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vite": "^7.1.1",
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }

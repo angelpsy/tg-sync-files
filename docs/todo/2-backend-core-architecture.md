@@ -302,17 +302,17 @@ Out of scope сейчас:
 
 ## 2.8. Композиция приложения
 
-- [ ] `/backend/src/lib.ts` с `createBackendServices` и сервис-фабрикой
-- [ ] `/backend/src/index.ts` экспорты интерфейсов и типов для frontend
+- [x] `/backend/src/lib.ts` с `createBackendServices` и сервис-фабрикой
+- [x] `/backend/src/index.ts` экспорты интерфейсов и типов для frontend
 - [x] Создать `/backend/src/core/services/SchedulerService.ts`:
   - [x] Периодическое сканирование FS (каждые 60 сек)
   - [x] Cleanup временных файлов
   - [x] Проверка состояния Telegram сессии
   - [x] Использовать cron-like планировщик или простые setTimeout
-- [ ] Graceful shutdown для всех сервисов (WebSocket, DB connections, file
+- [x] Graceful shutdown для всех сервисов (WebSocket, DB connections, file
       watchers, scheduler)
-- [ ] Environment validation и конфигурационный слой
-- [ ] Health check endpoints для мониторинга
+- [x] Environment validation и конфигурационный слой (`config/env.ts` + zod)
+- [x] Health check endpoint (`/health` on WS HTTP server)
 
 ## 2.9. Дополнительные задачи (пропущенные ранее)
 

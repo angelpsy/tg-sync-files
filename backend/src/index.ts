@@ -131,4 +131,27 @@ if (isDirectRun) {
   });
 }
 
-export { bootstrap };
+export * from '../../types';
+export { createBackendServices } from './lib';
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  import('./lib')
+    .then(m => m.createBackendServices())
+    .then(svcs => {
+      // eslint-disable-next-line no-console
+      console.log('Backend services started', { wsPort: svcs.config.wsPort });
+      const shutdown = async (signal: string) => {
+        // eslint-disable-next-line no-console
+        console.log(`Shutdown signal ${signal}`);
+        await svcs.shutdown();
+        process.exit(0);
+      };
+      process.on('SIGINT', () => void shutdown('SIGINT'));
+      process.on('SIGTERM', () => void shutdown('SIGTERM'));
+    })
+    .catch(err => {
+      // eslint-disable-next-line no-console
+      console.error('Fatal startup error', err);
+      process.exit(1);
+    });
+}

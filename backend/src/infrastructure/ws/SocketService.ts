@@ -38,6 +38,7 @@ export class SocketService implements ISocketService {
   private rateLimitDrops = 0;
   private draining = false;
   private perSocketWindows = new Map<string, number[]>(); // timestamps ms
+  private healthProvider?: () => unknown;
 
   constructor(opts: SocketServiceOptions) {
     this.opts = opts;
@@ -46,6 +47,21 @@ export class SocketService implements ISocketService {
   async initialize(): Promise<void> {
     if (this.io) return;
     this.server = createServer();
+    this.server.on('request', (req, res) => {
+      if (!req.url) return;
+      if (req.url === '/health') {
+        const payload = {
+          status: 'ok',
+          ...(this.healthProvider ? { data: this.healthProvider() } : {}),
+        };
+        const body = JSON.stringify(payload);
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        });
+        res.end(body);
+      }
+    });
     this.io = new IOServer(this.server, {
       cors: { origin: this.opts.corsOrigins || ['*'] },
       maxHttpBufferSize: this.opts.maxHttpBufferSize ?? 1_000_000,
@@ -153,6 +169,10 @@ export class SocketService implements ISocketService {
   }
   offClientConnect(handler: (clientId: string) => void): void {
     this.clientConnectHandlers.delete(handler);
+  }
+
+  setHealthProvider(fn: () => unknown): void {
+    this.healthProvider = fn;
   }
 
   getStats() {

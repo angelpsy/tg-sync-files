@@ -17,6 +17,8 @@ export const EWSMessageType = {
   UPLOAD_PROGRESS: 'upload_progress',
   UPLOAD_COMPLETE: 'upload_complete',
   UPLOAD_ERROR: 'upload_error',
+  UPLOAD_FILE_EVENT: 'upload_file_event',
+  SYNC_DIFF: 'sync_diff',
 
   // Download events
   DOWNLOAD_START: 'download_start',

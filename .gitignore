@@ -13,6 +13,7 @@ out/
 # Production builds
 /build
 dist/
+backend/dist-vite/
 
 # TypeScript
 *.tsbuildinfo

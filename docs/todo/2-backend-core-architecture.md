@@ -87,18 +87,24 @@
 
 - [x] Создать `/backend/src/infrastructure/storage/StorageService.ts`
 - [x] Методы для работы с Channels, FolderTopicLinks, TelegramSession
-- [x] Прописать схему Prisma и naming conventions в `schema.prisma`
+- [x] Прописать схему Prisma и naming conventions in `schema.prisma`
 - [x] Выбрать формат хранения `StringSession` (binary vs base64) в БД
 
 ## 2.4. TelegramService
 
-- [ ] Создать `/backend/src/infrastructure/telegram/TelegramService.ts`
-- [ ] Инициализация сессии через GramJS
-- [ ] Методы: `getTopics`, `uploadFileForTopic`, `downloadTopicFiles`,
-      `renameTopic`
-- [ ] Задокументировать flow авторизации (Phone → Code → Password) и
-      взаимодействие UI
-- [ ] Реализовать retry с экспоненциальной задержкой (параметры в конфиге)
+- [x] Создать `/backend/src/infrastructure/telegram/TelegramService.ts`
+- [x] Инициализация сессии через GramJS
+- [x] Методы:
+  - `getTopics`
+  - `uploadFile` (переименовано с `uploadFileForTopic`)
+  - `listTopicFiles`
+  - `downloadTopicFiles`
+  - `renameTopic`
+- [x] Задокументировать flow авторизации (Phone → Code → Password) и
+      взаимодействие UI (перенесено в `docs/architecture.md`)
+- [x] Задокументировать временный smoke CLI (`.tmp/scripts/telegramSmoke.ts`) и
+      его границы (перенесено в `docs/architecture.md`)
+- [x] Реализовать retry с экспоненциальной задержкой (параметры в конфиге)
 
 ## 2.5. SyncService
 

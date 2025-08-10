@@ -4,7 +4,7 @@
 
 import type { IDownloadOptions, IDownloadResult, IFileInfo } from '../file-sync/index.js';
 
-import type { IChannelStatus, ITelegramChannel, ITelegramSession, ITopic } from './models.js';
+import type { IChannelStatus, ITelegramChannel, ITopic } from './models.js';
 
 /**
  * Telegram Service Interface
@@ -17,19 +17,14 @@ export interface ITelegramService {
   initialize(): Promise<void>;
 
   /**
-   * Initializes Telegram session
-   */
-  initSession(): Promise<void>;
-
-  /**
    * Authenticates with phone number
    */
-  authenticate(phoneNumber: string): Promise<{ needsCode: boolean }>;
+  authenticate(phoneNumber?: string): Promise<{ needsPassword: boolean; needsCode: boolean }>;
 
   /**
    * Confirms authentication with SMS code
    */
-  confirmAuth(code: string): Promise<ITelegramSession>;
+  confirmAuth(code: string): Promise<boolean>;
 
   /**
    * Gets available channels
@@ -49,22 +44,13 @@ export interface ITelegramService {
   /**
    * Uploads file to topic
    */
-  uploadFile(filePath: string, topicId: string): Promise<{ messageId: string }>;
-
-  /**
-   * Uploads file for topic (legacy method)
-   */
-  uploadFileForTopic(topicId: string, file: IFileInfo): Promise<void>;
-
-  /**
-   * Downloads file from message
-   */
-  downloadFile(messageId: string, outputPath: string): Promise<void>;
+  uploadFile(file: IFileInfo, topicId: string, channelId: string): Promise<void>;
 
   /**
    * Downloads files from topic
    */
-  downloadTopicFiles(
+  downloadFiles(
+    channelId: string,
     topicId: string,
     targetPath: string,
     opts?: IDownloadOptions
@@ -73,15 +59,27 @@ export interface ITelegramService {
   /**
    * Renames topic
    */
-  renameTopic(topicId: string, newName: string): Promise<void>;
+  renameTopic(topicId: string, newName: string, channelId: string): Promise<void>;
 
   /**
-   * Gets channel connection status
+   * Checks session status
    */
-  getChannelStatus(channelId: string): Promise<IChannelStatus>;
+  checkSession(): Promise<boolean>;
 
   /**
    * Disconnects from Telegram
    */
-  disconnect(): Promise<void>;
+  destroy(): Promise<void>;
+
+  // Legacy methods for backward compatibility
+  initSession?(): Promise<void>;
+  uploadFileForTopic?(topicId: string, file: IFileInfo): Promise<void>;
+  downloadFile?(messageId: string, outputPath: string): Promise<void>;
+  downloadTopicFiles?(
+    topicId: string,
+    targetPath: string,
+    opts?: IDownloadOptions
+  ): Promise<IDownloadResult>;
+  getChannelStatus?(channelId: string): Promise<IChannelStatus>;
+  disconnect?(): Promise<void>;
 }

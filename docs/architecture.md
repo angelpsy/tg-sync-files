@@ -445,3 +445,37 @@ tgstore/
 ├── .env
 └── docker-compose.yml
 ```
+
+## Telegram: Flow авторизации (Phone → Code → Password)
+
+1. initSession() загружает сохранённый StringSession через IStorageService. Если
+   отсутствует — создаётся клиент с пустой сессией.
+2. Отправка кода: client.sendCode / high-level метод GramJS на TELEGRAM_PHONE.
+3. UI состояния: idle → phone_submitted → code_sent → awaiting_code → (optional)
+   awaiting_password → authorized.
+4. Пользователь вводит код → backend вызывает client.signIn({ phoneNumber,
+   phoneCode }).
+5. Если 2FA включён: ловим SESSION_PASSWORD_NEEDED →
+   client.checkPassword(password).
+6. После авторизации сохраняем новый StringSession (saveTelegramSession).
+7. Ошибки (FloodWait, неверный код/пароль) транслируются через WebSocket события
+   статуса.
+
+### Реализационные детали
+
+- Кеширование каналов для снижения FloodWait (минимизация getDialogs вызовов).
+- Единый RetryManager с экспоненциальным backoff.
+- listTopicFiles через messages.GetReplies.
+- Инфраструктурный слой не содержит бизнес-правил.
+
+## Smoke CLI (.tmp/scripts/telegramSmoke.ts)
+
+Цель: ручная верификация TelegramService (каналы, топики, загрузка, листинг).
+
+Характеристики:
+
+- Временный dev-инструмент, не участвует в core, хранится строго в .tmp.
+- Запуск: pnpm tsx .tmp/scripts/telegramSmoke.ts <flags>
+- Флаги: --channels, --create-topic <name>, --list, --volatile, --no-auth.
+- Сессия: .tmp/session.json (или volatile in-memory при --volatile).
+- Не добавляется в package.json scripts.

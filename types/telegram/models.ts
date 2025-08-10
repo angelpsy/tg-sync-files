@@ -4,41 +4,50 @@
 
 import type { TChannelConnectionStatus } from './enums.js';
 
-/**
- * Telegram channel configuration
- */
+/** Telegram channel configuration */
 export interface ITelegramChannel {
   id: string;
-  name: string;
-  isActive: boolean;
+  title: string;
+  name?: string; // Alias for title for backward compatibility
+  username?: string;
+  accessHash?: string;
+  isGroup: boolean;
+  isForum: boolean;
+  participantsCount: number;
+  isActive?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-/**
- * Topic within a channel
- */
+/** Forum topic inside a channel */
 export interface ITopic {
   id: string;
-  name: string;
   channelId: string;
+  title: string;
+  name?: string; // Alias for title for backward compatibility
+  iconColor?: number;
+  iconEmojiId?: string;
+  isGeneral: boolean;
+  isClosed: boolean;
+  isHidden: boolean;
+  totalMessages: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
-/**
- * Telegram session data
- */
+/** Persisted Telegram MTProto session */
 export interface ITelegramSession {
   id: string;
-  stringSession: string;
-  phoneNumber: string;
+  sessionData: string; // Renamed from stringSession
+  stringSession?: string; // For backward compatibility
+  phoneNumber?: string;
   isActive: boolean;
+  lastUsed: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
-/**
- * Channel status for WebSocket events
- */
+/** Channel connection / sync status */
 export interface IChannelStatus {
   channelId: string;
   isConnected: boolean;

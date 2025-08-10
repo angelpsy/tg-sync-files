@@ -4,23 +4,18 @@ import { Server as IOServer, type Socket } from 'socket.io';
 
 import { serviceLoggers } from '../../../../shared/logger';
 
-import type {
-  IFileSyncEvent,
-  ISocketService,
-  ISyncDiffResult,
-  IUploadCompleteEvent,
-  IUploadErrorEvent,
-  IUploadFileEvent,
-  IUploadProgress,
-  IUploadStartEvent,
-  IWSConnectionInfo,
-  IWSMessage,
-} from '@/types';
-import type { IChannelStatus } from '@/types/telegram';
+import type { ISocketService, IWSConnectionInfo, IWSMessage } from '@/types';
+import {
+  WS_PROTOCOL_VERSION,
+  type EventPayloadMap,
+  type TEventName,
+} from '@/types/websocket/events.js';
 
 interface SocketServiceOptions {
   port: number; // if 0 use random free port (main HTTP server not yet integrated)
   corsOrigins?: string[];
+  maxHttpBufferSize?: number;
+  rateLimit?: { windowMs: number; max: number; banAfter?: number };
 }
 
 /**
@@ -31,10 +26,18 @@ export class SocketService implements ISocketService {
   private io?: IOServer;
   private server?: HttpServer;
   private opts: SocketServiceOptions;
-  private connectionHandlers: Array<(c: IWSConnectionInfo) => void> = [];
-  private disconnectionHandlers: Array<(c: IWSConnectionInfo) => void> = [];
-  private messageHandlers: Array<(clientId: string, msg: IWSMessage<unknown>) => void> = [];
-  private clientConnectHandlers: Array<(clientId: string) => void> = [];
+  private connectionHandlers = new Set<(c: IWSConnectionInfo) => void>();
+  private disconnectionHandlers = new Set<(c: IWSConnectionInfo) => void>();
+  private messageHandlers = new Set<(clientId: string, msg: IWSMessage<unknown>) => void>();
+  private clientConnectHandlers = new Set<(clientId: string) => void>();
+
+  private startedAt: Date = new Date();
+  private messagesIn = 0;
+  private messagesOut = 0;
+  private errors = 0;
+  private rateLimitDrops = 0;
+  private draining = false;
+  private perSocketWindows = new Map<string, number[]>(); // timestamps ms
 
   constructor(opts: SocketServiceOptions) {
     this.opts = opts;
@@ -45,6 +48,11 @@ export class SocketService implements ISocketService {
     this.server = createServer();
     this.io = new IOServer(this.server, {
       cors: { origin: this.opts.corsOrigins || ['*'] },
+      maxHttpBufferSize: this.opts.maxHttpBufferSize ?? 1_000_000,
+    });
+    this.io.engine.on('connection_error', err => {
+      this.errors++;
+      this.logger.error('WS engine connection error', { error: err.message });
     });
     this.io.on('connection', socket => this.handleConnection(socket));
     await new Promise<void>(resolve => this.server && this.server.listen(this.opts.port, resolve));
@@ -53,6 +61,11 @@ export class SocketService implements ISocketService {
   }
 
   private handleConnection(socket: Socket): void {
+    if (this.draining) {
+      socket.disconnect(true);
+      return;
+    }
+
     const info: IWSConnectionInfo = {
       id: socket.id,
       connectedAt: new Date(),
@@ -64,20 +77,40 @@ export class SocketService implements ISocketService {
     this.clientConnectHandlers.forEach(h => h(socket.id));
 
     socket.on('message', (msg: IWSMessage<unknown>) => {
-      this.messageHandlers.forEach(h => h(socket.id, msg));
+      this.messagesIn++;
+      if (this.enforceRateLimit(socket.id)) return;
+      try {
+        this.messageHandlers.forEach(h => h(socket.id, msg));
+      } catch (e) {
+        this.errors++;
+        this.logger.error('Message handler error', { error: e });
+      }
     });
     socket.on('disconnect', reason => {
       this.disconnectionHandlers.forEach(h => h(info));
       this.logger.info('Client disconnected', { id: socket.id, reason });
+      this.perSocketWindows.delete(socket.id);
     });
   }
 
   async broadcast<T>(message: IWSMessage<T>): Promise<void> {
-    this.io?.emit('message', message);
+    if (!this.io) return;
+    if ((await this.getConnectedClients()).length === 0) return; // skip empty
+    this.io.emit('message', { protocolVersion: WS_PROTOCOL_VERSION, ...message });
+    this.messagesOut++;
   }
 
   async sendToClient<T>(clientId: string, message: IWSMessage<T>): Promise<void> {
-    this.io?.to(clientId).emit('message', message);
+    if (!this.io) return;
+    this.io.to(clientId).emit('message', { protocolVersion: WS_PROTOCOL_VERSION, ...message });
+    this.messagesOut++;
+  }
+
+  emit<E extends TEventName>(event: E, payload: EventPayloadMap[E]): void {
+    if (!this.io) return;
+    if (this.io.engine.clientsCount === 0) return;
+    this.io.emit(event, payload);
+    this.messagesOut++;
   }
 
   async getConnectedClients(): Promise<IWSConnectionInfo[]> {
@@ -97,47 +130,72 @@ export class SocketService implements ISocketService {
   }
 
   onConnection(handler: (connectionInfo: IWSConnectionInfo) => void): void {
-    this.connectionHandlers.push(handler);
+    this.connectionHandlers.add(handler);
+  }
+  offConnection(handler: (connectionInfo: IWSConnectionInfo) => void): void {
+    this.connectionHandlers.delete(handler);
   }
   onDisconnection(handler: (connectionInfo: IWSConnectionInfo) => void): void {
-    this.disconnectionHandlers.push(handler);
+    this.disconnectionHandlers.add(handler);
+  }
+  offDisconnection(handler: (connectionInfo: IWSConnectionInfo) => void): void {
+    this.disconnectionHandlers.delete(handler);
   }
   onMessage<T>(handler: (clientId: string, message: IWSMessage<T>) => void): void {
-    // store as unknown but call generically
-    this.messageHandlers.push(handler as (c: string, m: IWSMessage<unknown>) => void);
+    this.messageHandlers.add(handler as (c: string, m: IWSMessage<unknown>) => void);
+  }
+  offMessage<T>(handler: (clientId: string, message: IWSMessage<T>) => void): void {
+    this.messageHandlers.delete(handler as (c: string, m: IWSMessage<unknown>) => void);
   }
 
-  emitFileSync(event: IFileSyncEvent): void {
-    this.io?.emit('file_sync_event', event);
-  }
-  emitUploadProgress(progress: IUploadProgress): void {
-    this.io?.emit('upload_progress', progress);
-  }
-  emitChannelStatus(status: IChannelStatus): void {
-    this.io?.emit('channel_status', status);
-  }
-  emitUploadStart(event: IUploadStartEvent): void {
-    this.io?.emit('upload_start', event);
-  }
-  emitUploadComplete(event: IUploadCompleteEvent): void {
-    this.io?.emit('upload_complete', event);
-  }
-  emitUploadError(event: IUploadErrorEvent): void {
-    this.io?.emit('upload_error', event);
-  }
-  emitUploadFileEvent(event: IUploadFileEvent): void {
-    this.io?.emit('upload_file_event', event);
-  }
-  emitSyncDiff(diff: ISyncDiffResult): void {
-    this.io?.emit('sync_diff', diff);
-  }
   onClientConnect(handler: (clientId: string) => void): void {
-    this.clientConnectHandlers.push(handler);
+    this.clientConnectHandlers.add(handler);
+  }
+  offClientConnect(handler: (clientId: string) => void): void {
+    this.clientConnectHandlers.delete(handler);
+  }
+
+  getStats() {
+    const uptimeMs = Date.now() - this.startedAt.getTime();
+    return {
+      connections: this.io?.engine.clientsCount ?? 0,
+      messagesIn: this.messagesIn,
+      messagesOut: this.messagesOut,
+      startedAt: this.startedAt,
+      uptimeMs,
+      errors: this.errors,
+      rateLimitDrops: this.rateLimitDrops,
+    };
   }
 
   async shutdown(): Promise<void> {
-    this.logger.info('SocketService shutting down');
+    this.logger.info('SocketService shutting down', this.getStats());
+    this.draining = true;
     await new Promise<void>(resolve => this.io?.close(() => resolve()));
     if (this.server) await new Promise<void>(resolve => this.server?.close(() => resolve()));
+  }
+
+  private enforceRateLimit(clientId: string): boolean {
+    const rl = this.opts.rateLimit;
+    if (!rl) return false;
+    const now = Date.now();
+    const windowStart = now - rl.windowMs;
+    let arr = this.perSocketWindows.get(clientId);
+    if (!arr) {
+      arr = [];
+      this.perSocketWindows.set(clientId, arr);
+    }
+    // prune
+    while (arr.length && arr[0] < windowStart) arr.shift();
+    if (arr.length >= rl.max) {
+      this.rateLimitDrops++;
+      if (rl.banAfter && arr.length >= rl.banAfter) {
+        const sock = this.io?.sockets.sockets.get(clientId);
+        sock?.disconnect(true);
+      }
+      return true; // drop
+    }
+    arr.push(now);
+    return false;
   }
 }

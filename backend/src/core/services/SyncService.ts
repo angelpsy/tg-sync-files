@@ -120,14 +120,14 @@ export class SyncService implements ISyncService {
       conflictPolicy: session.conflictPolicy,
       hashStrategy: session.hashStrategy,
     });
-    this.socketService?.emitUploadStart({
+    this.socketService?.emit('upload_start', {
       uploadId: sessionId,
       folderPath,
       topicId,
       totalFiles: session.totalFiles,
       timestamp: Date.now(),
     });
-    this.socketService?.emitUploadProgress({
+    this.socketService?.emit('upload_progress', {
       uploadId: sessionId,
       fileName: '',
       fileIndex: 0,
@@ -356,7 +356,7 @@ export class SyncService implements ISyncService {
           unchanged: unchangedFiles.length,
         },
       });
-      this.socketService?.emitSyncDiff?.(diff);
+      this.socketService?.emit('sync_diff', diff);
       return diff;
     } catch (err) {
       this.logger.error('syncFolder failed', { topicId, error: err });
@@ -435,7 +435,7 @@ export class SyncService implements ISyncService {
             s.uploadedFiles += 1; // treat as satisfied
             s.skipped += 1;
             s.progress = Math.round((s.uploadedFiles / s.totalFiles) * 100);
-            this.socketService?.emitUploadProgress({
+            this.socketService?.emit('upload_progress', {
               uploadId: s.id,
               fileName: file.name,
               fileIndex: s.uploadedFiles,
@@ -445,7 +445,7 @@ export class SyncService implements ISyncService {
               speed: 0,
               eta: 0,
             });
-            this.socketService?.emitUploadFileEvent({
+            this.socketService?.emit('upload_file_event', {
               uploadId: s.id,
               topicId: s.topicId,
               fileName: file.name,
@@ -474,7 +474,7 @@ export class SyncService implements ISyncService {
             (file as unknown as { name: string; originalName?: string }).originalName =
               originalName;
             (file as unknown as { name: string }).name = candidateName;
-            this.socketService?.emitUploadFileEvent({
+            this.socketService?.emit('upload_file_event', {
               uploadId: s.id,
               topicId: s.topicId,
               fileName: candidateName,
@@ -537,7 +537,7 @@ export class SyncService implements ISyncService {
               error: persistErr,
             });
           }
-          this.socketService?.emitUploadProgress({
+          this.socketService?.emit('upload_progress', {
             uploadId: s.id,
             fileName: file.name,
             fileIndex: s.uploadedFiles,
@@ -547,7 +547,7 @@ export class SyncService implements ISyncService {
             speed: 0,
             eta: 0,
           });
-          this.socketService?.emitUploadFileEvent?.({
+          this.socketService?.emit('upload_file_event', {
             uploadId: s.id,
             topicId: s.topicId,
             fileName: file.name,
@@ -568,7 +568,7 @@ export class SyncService implements ISyncService {
         );
         s.currentFile = file.name;
         s.updatedAt = new Date();
-        this.socketService?.emitUploadProgress({
+        this.socketService?.emit('upload_progress', {
           uploadId: s.id,
           fileName: file.name,
           fileIndex: s.uploadedFiles,
@@ -625,7 +625,7 @@ export class SyncService implements ISyncService {
           } catch (e) {
             this.logger.error('upsertFileRecord failed', { file: file.name, error: e });
           }
-          this.socketService?.emitUploadProgress({
+          this.socketService?.emit('upload_progress', {
             uploadId: s.id,
             fileName: file.name,
             fileIndex: s.uploadedFiles,
@@ -635,7 +635,7 @@ export class SyncService implements ISyncService {
             speed: 0,
             eta: 0,
           });
-          this.socketService?.emitUploadFileEvent?.({
+          this.socketService?.emit('upload_file_event', {
             uploadId: s.id,
             topicId: s.topicId,
             fileName: file.name,
@@ -647,7 +647,7 @@ export class SyncService implements ISyncService {
         } catch (err) {
           s.failedFiles.push(file.name);
           this.logger.error('File upload failed', { file: file.name, error: err });
-          this.socketService?.emitUploadProgress({
+          this.socketService?.emit('upload_progress', {
             uploadId: s.id,
             fileName: file.name,
             fileIndex: s.uploadedFiles,
@@ -657,7 +657,7 @@ export class SyncService implements ISyncService {
             speed: 0,
             eta: 0,
           });
-          this.socketService?.emitUploadFileEvent?.({
+          this.socketService?.emit('upload_file_event', {
             uploadId: s.id,
             topicId: s.topicId,
             fileName: file.name,
@@ -682,7 +682,7 @@ export class SyncService implements ISyncService {
           }
         }
         s.completedAt = new Date();
-        this.socketService?.emitUploadComplete({
+        this.socketService?.emit('upload_complete', {
           uploadId: s.id,
           topicId: s.topicId,
           totalFiles: s.totalFiles,
@@ -697,7 +697,7 @@ export class SyncService implements ISyncService {
           conflictsRenamed: s.conflictsRenamed,
           conflictsLogged: s.conflictsLogged,
         });
-        this.socketService?.emitUploadProgress({
+        this.socketService?.emit('upload_progress', {
           uploadId: s.id,
           fileName: s.currentFile || '',
           fileIndex: s.uploadedFiles,
@@ -714,7 +714,7 @@ export class SyncService implements ISyncService {
       s.error = (err as Error).message;
       s.completedAt = new Date();
       s.updatedAt = new Date();
-      this.socketService?.emitUploadError({
+      this.socketService?.emit('upload_error', {
         uploadId: s.id,
         topicId: s.topicId,
         error: (err as Error).message,
@@ -948,7 +948,7 @@ export class SyncService implements ISyncService {
         };
         this.sessions.set(updated.id, internal);
         // Reuse progress event to signal restored state (frontend can interpret status PARTIAL)
-        this.socketService?.emitUploadProgress?.({
+        this.socketService?.emit('upload_progress', {
           uploadId: updated.id,
           fileName: updated.currentFile || '',
           fileIndex: updated.uploadedFiles,

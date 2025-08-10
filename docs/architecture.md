@@ -518,8 +518,37 @@ tgstore/
   последней фиксации.
 - Частичные сбои: статус COMPLETED + флаг hasFailures=true, FAILED только если
   все попытки неуспешны.
-- WebSocket прогресс: emitUploadProgress на старте, каждом файле, пропуске и
-  завершении.
+- WebSocket прогресс: (ранее emitUploadProgress) теперь через generic
+  `socketService.emit('upload_progress', payload)` на старте, каждом файле,
+  пропуске и завершении.
+
+### WebSocket Events (стандартизовано)
+
+Используется единый generic API:
+
+```ts
+socketService.emit('upload_start', { uploadId, folderPath, topicId, totalFiles, timestamp });
+socketService.emit('upload_progress', { uploadId, fileName, fileIndex, totalFiles, uploadedBytes, totalBytes, speed, eta });
+socketService.emit('upload_file_event', { uploadId, fileName, fileIndex, totalFiles, status: 'uploaded'|'skipped'|'renamed'|'failed', timestamp, reason?, error? });
+socketService.emit('upload_error', { uploadId, topicId, error, timestamp });
+socketService.emit('upload_complete', { uploadId, topicId, totalFiles, uploadedFiles, failedFiles, durationMs, timestamp });
+socketService.emit('sync_diff', diffPayload);
+socketService.emit('channel_status_update', statusPayload);
+```
+
+Правила:
+
+- Только перечисленные в `types/websocket/events.ts` имена.
+- Все исходящие сообщения внутри SocketService автоматически получают
+  `protocolVersion`.
+- Таргетированная отправка: `sendToClient(id, { type, payload })` либо
+  (рекомендовано) event-based emit + client-side фильтрация.
+- Broadcast не выполняется при отсутствии подключений (оптимизация).
+
+Миграция: старые методы `emitUploadProgress`, `emitUploadStart`,
+`emitUploadComplete`, `emitUploadError`, `emitUploadFileEvent`, `emitSyncDiff`,
+`emitChannelStatus`, `emitFileSync` удалены ради унификации и устранения
+дублирования API.
 
 Запланированные улучшения (roadmap):
 

@@ -2,17 +2,9 @@
  * WebSocket domain interfaces
  */
 
-import type {
-  IFileSyncEvent,
-  ISyncDiffResult,
-  IUploadCompleteEvent,
-  IUploadErrorEvent,
-  IUploadFileEvent,
-  IUploadProgress,
-  IUploadStartEvent,
-} from '../file-sync/index.js';
-import type { IChannelStatus } from '../telegram/index.js';
+// Legacy specific event payload types removed from interface surface; use EventPayloadMap instead
 
+import type { EventPayloadMap, TEventName } from './events.js';
 import type { IWSConnectionInfo, IWSMessage } from './models.js';
 
 /**
@@ -35,6 +27,9 @@ export interface ISocketService {
    */
   sendToClient<T>(clientId: string, message: IWSMessage<T>): Promise<void>;
 
+  /** Generic emit by event name */
+  emit<E extends TEventName>(event: E, payload: EventPayloadMap[E]): void;
+
   /**
    * Gets connected clients
    */
@@ -51,33 +46,26 @@ export interface ISocketService {
   onConnection(handler: (connectionInfo: IWSConnectionInfo) => void): void;
   onDisconnection(handler: (connectionInfo: IWSConnectionInfo) => void): void;
   onMessage<T>(handler: (clientId: string, message: IWSMessage<T>) => void): void;
-
-  /**
-   * Emits file sync event
-   */
-  emitFileSync(event: IFileSyncEvent): void;
-
-  /**
-   * Emits upload progress
-   */
-  emitUploadProgress(progress: IUploadProgress): void;
-
-  /**
-   * Emits channel status
-   */
-  emitChannelStatus(status: IChannelStatus): void;
-
-  /** Upload lifecycle events */
-  emitUploadStart(event: IUploadStartEvent): void;
-  emitUploadComplete(event: IUploadCompleteEvent): void;
-  emitUploadError(event: IUploadErrorEvent): void;
-  emitUploadFileEvent(event: IUploadFileEvent): void;
-  emitSyncDiff(diff: ISyncDiffResult): void;
+  offConnection(handler: (connectionInfo: IWSConnectionInfo) => void): void;
+  offDisconnection(handler: (connectionInfo: IWSConnectionInfo) => void): void;
+  offMessage<T>(handler: (clientId: string, message: IWSMessage<T>) => void): void;
 
   /**
    * Subscribes to client connections
    */
   onClientConnect(handler: (clientId: string) => void): void;
+  offClientConnect(handler: (clientId: string) => void): void;
+
+  /** Returns runtime stats */
+  getStats(): {
+    connections: number;
+    messagesIn: number;
+    messagesOut: number;
+    startedAt: Date;
+    uptimeMs: number;
+    errors: number;
+    rateLimitDrops: number;
+  };
 
   /**
    * Shuts down WebSocket server

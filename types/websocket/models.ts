@@ -12,6 +12,7 @@ export interface IWSMessage<T = unknown> {
   payload: T;
   timestamp: number;
   id?: string;
+  protocolVersion?: number; // wire protocol version
 }
 
 /**

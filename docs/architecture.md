@@ -46,7 +46,8 @@ export interface IFSService {
 /**
  * Контракт сервиса синхронизации папок и топиков
  */
-export interface ISyncService {
+// Renamed: ISyncService -> IUploadOrchestrator
+export interface IUploadOrchestrator {
   /** Запустить загрузку файлов из папки в топик */
   uploadFolderToTopic(
     folderPath: string,

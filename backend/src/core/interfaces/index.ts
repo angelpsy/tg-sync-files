@@ -8,8 +8,8 @@ import type {
   ISchedulerService,
   ISocketService,
   IStorageService,
-  ISyncService,
   ITelegramService,
+  IUploadOrchestrator,
 } from '@/types';
 
 /**
@@ -18,7 +18,7 @@ import type {
  */
 export interface IServiceRegistry {
   fsService: IFSService;
-  syncService: ISyncService;
+  uploadOrchestrator: IUploadOrchestrator;
   telegramService: ITelegramService;
   storageService: IStorageService;
   socketService: ISocketService;

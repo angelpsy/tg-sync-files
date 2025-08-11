@@ -13,7 +13,7 @@ import {
   type IFileInfo,
   type IFileRecord,
   type ISyncDiffResult,
-  type ISyncService,
+  type IUploadOrchestrator,
   type IUploadProgress,
   type IUploadResult,
   type IUploadSession,
@@ -23,15 +23,16 @@ import {
 import type { ITelegramService } from '@/types/telegram';
 import type { ISocketService } from '@/types/websocket';
 
-interface SyncServiceOptions {
+interface UploadOrchestratorOptions {
   maxParallelUploads: number; // currently 1
   persistIntervalMs: number; // 60000
 }
 
 /**
- * SyncService – orchestrates folder → Telegram topic uploads.
+ * UploadOrchestrator – orchestrates one-way folder → Telegram topic uploads.
+ * (Formerly SyncService; renamed to avoid implying full bi-directional sync.)
  * Sequential uploads (maxParallelUploads = 1) with in-memory session tracking.
- * Persistence every persistIntervalMs via injected ISchedulerService (placeholder integration).
+ * Persistence every persistIntervalMs via injected ISchedulerService.
  */
 interface InternalSession extends IUploadSession {
   failedFiles: string[];
@@ -45,10 +46,10 @@ interface InternalSession extends IUploadSession {
   conflictsLogged: number; // conflicts only logged (LOG_ONLY)
 }
 
-export class SyncService implements ISyncService {
-  private readonly logger = serviceLoggers.sync;
+export class UploadOrchestrator implements IUploadOrchestrator {
+  private readonly logger = serviceLoggers.upload;
   private sessions = new Map<string, InternalSession>();
-  private options: SyncServiceOptions;
+  private options: UploadOrchestratorOptions;
   private persistTimer?: NodeJS.Timeout;
   private persistenceTaskId = 'upload-session-persist';
   private lastPersisted = new Map<string, Date>();
@@ -61,14 +62,14 @@ export class SyncService implements ISyncService {
     private readonly storageService: IStorageService,
     private readonly scheduler: ISchedulerService,
     private readonly socketService: ISocketService | undefined,
-    opts?: Partial<SyncServiceOptions>
+    opts?: Partial<UploadOrchestratorOptions>
   ) {
     this.options = {
       maxParallelUploads: 1,
       persistIntervalMs: 60_000,
       ...opts,
     };
-    this.logger.info('SyncService initialized', { options: this.options });
+    this.logger.info('UploadOrchestrator initialized', { options: this.options });
   }
 
   /** Uploads folder to topic (blocking until completion) */
@@ -261,7 +262,6 @@ export class SyncService implements ISyncService {
           newFiles.push(file.name);
           continue;
         }
-        // quick fingerprint compare
         if (rec.size !== file.size || rec.mtimeMs !== file.updatedAt.getTime()) {
           updatedFiles.push(file.name);
         } else {
@@ -276,7 +276,6 @@ export class SyncService implements ISyncService {
         if (!localMap.has(rn) && !recordMap.has(rn)) remoteOnlyFiles.push(rn);
       }
 
-      // Upload new + updated sequentially (reuse upload logic minimal subset)
       for (const name of [...newFiles, ...updatedFiles]) {
         const file = localMap.get(name);
         if (!file) continue;
@@ -287,7 +286,6 @@ export class SyncService implements ISyncService {
             hashStrategy === EFileHashStrategy.EAGER || hashStrategy === EFileHashStrategy.ON_DEMAND
           );
           await this.telegramService.uploadFile(file, topicId, sessions[0].channelId);
-          // upsert record
           try {
             await this.storageService.upsertFileRecord({
               id: `${topicId}:${file.name}`,
@@ -311,7 +309,6 @@ export class SyncService implements ISyncService {
         }
       }
 
-      // enhancement: if hashStrategy provides hash and record has hash, refine updated vs unchanged
       if (hashStrategy !== EFileHashStrategy.NONE) {
         for (let i = 0; i < updatedFiles.length; i++) {
           const fname = updatedFiles[i];
@@ -327,7 +324,6 @@ export class SyncService implements ISyncService {
                 hashStrategy === EFileHashStrategy.ON_DEMAND
             );
             if (rec.hash && fp.hash && rec.hash === fp.hash && rec.size === fp.size) {
-              // false positive: size/mtime change but content hash same -> treat as unchanged
               unchangedFiles.push(fname);
               updatedFiles.splice(i, 1);
               i--;
@@ -377,14 +373,14 @@ export class SyncService implements ISyncService {
     const files = await this.collectFiles(folderPath);
     const localNames = new Set<string>();
     for (const f of files) {
-      if (localNames.has(f.name)) return true; // local duplicate
+      if (localNames.has(f.name)) return true;
       localNames.add(f.name);
     }
     try {
       const remote = await this.telegramService.listTopicFiles(channelId, topicId);
       const remoteNames = new Set(remote.map(r => r.name).filter(Boolean) as string[]);
       for (const f of files) {
-        if (remoteNames.has(f.name)) return true; // remote duplicate name
+        if (remoteNames.has(f.name)) return true;
       }
     } catch (err) {
       this.logger.warn('Remote duplicate check failed (continuing with local only)', {
@@ -393,8 +389,6 @@ export class SyncService implements ISyncService {
     }
     return false;
   }
-
-  // --- Internal helpers ---
 
   private getSession(sessionId: string): InternalSession {
     const s = this.sessions.get(sessionId);
@@ -412,7 +406,6 @@ export class SyncService implements ISyncService {
 
     try {
       const files = await this.collectFiles(s.folderPath);
-      // Remote file listing (best-effort) for skip logic
       let remoteNames: Set<string> | null = null;
       try {
         const remote = await this.telegramService.listTopicFiles(s.channelId, s.topicId);
@@ -425,14 +418,13 @@ export class SyncService implements ISyncService {
       }
       for (const file of files) {
         if (s.status !== EUploadStatus.UPLOADING) break;
-        // Remote duplicate handling with conflict policy
         if (remoteNames && remoteNames.has(file.name)) {
           if (s.conflictPolicy === EUploadConflictPolicy.SKIP) {
             this.logger.info('Skipping already present remote file (policy=SKIP)', {
               file: file.name,
             });
             s.conflictsSkipped += 1;
-            s.uploadedFiles += 1; // treat as satisfied
+            s.uploadedFiles += 1;
             s.skipped += 1;
             s.progress = Math.round((s.uploadedFiles / s.totalFiles) * 100);
             this.socketService?.emit('upload_progress', {
@@ -470,7 +462,6 @@ export class SyncService implements ISyncService {
               to: candidateName,
             });
             s.conflictsRenamed += 1;
-            // Create a shallow mutable clone to avoid mutating original reference if reused
             (file as unknown as { name: string; originalName?: string }).originalName =
               originalName;
             (file as unknown as { name: string }).name = candidateName;
@@ -481,7 +472,7 @@ export class SyncService implements ISyncService {
               originalName,
               action: 'renamed',
               reason: 'conflict',
-              index: s.uploadedFiles, // not incremented yet
+              index: s.uploadedFiles,
               totalFiles: s.totalFiles,
               timestamp: Date.now(),
             });
@@ -490,10 +481,8 @@ export class SyncService implements ISyncService {
               file: file.name,
             });
             s.conflictsLogged += 1;
-            // proceed without changes
           }
         }
-        // Fingerprint quick check
         let existing: IFileRecord | null = null;
         try {
           existing = await this.storageService.getFileRecord(s.topicId, file.name);
@@ -510,7 +499,6 @@ export class SyncService implements ISyncService {
           s.uploadedFiles += 1;
           s.skipped += 1;
           s.progress = Math.round((s.uploadedFiles / s.totalFiles) * 100);
-          // Best-effort persist after skip
           try {
             await this.storageService.saveUploadSession({
               id: s.id,
@@ -559,7 +547,6 @@ export class SyncService implements ISyncService {
           });
           continue;
         }
-        // Need full hash? (eager) or (on_demand & file will be uploaded)
         const fullFingerprint = await this.buildFingerprint(
           file,
           s.hashStrategy,
@@ -583,7 +570,6 @@ export class SyncService implements ISyncService {
           s.uploadedFiles += 1;
           s.realUploaded += 1;
           s.progress = Math.round((s.uploadedFiles / s.totalFiles) * 100);
-          // Best-effort persist after successful upload
           try {
             await this.storageService.saveUploadSession({
               id: s.id,
@@ -671,14 +657,13 @@ export class SyncService implements ISyncService {
         }
       }
       if (s.status === EUploadStatus.UPLOADING) {
-        // uploadedFiles here counts satisfied files (uploaded or skipped). failedFiles contains only real failures.
         if (s.failedFiles.length === 0) {
           s.status = EUploadStatus.COMPLETED;
         } else {
           if (s.uploadedFiles > 0) {
-            s.status = EUploadStatus.PARTIAL; // now explicit partial
+            s.status = EUploadStatus.PARTIAL;
           } else {
-            s.status = EUploadStatus.FAILED; // total failure
+            s.status = EUploadStatus.FAILED;
           }
         }
         s.completedAt = new Date();
@@ -725,7 +710,6 @@ export class SyncService implements ISyncService {
 
   private toResult(sessionId: string): IUploadResult {
     const s = this.getSession(sessionId);
-    // NOTE: uploadedFiles includes satisfied (uploaded + skipped) to reflect overall progress; failedFiles are definitive failures.
     return {
       uploadId: s.id,
       status: s.status,
@@ -769,9 +753,8 @@ export class SyncService implements ISyncService {
   }
 
   private ensurePersistenceLoop(): void {
-    // Use scheduler instead of raw setInterval
     if (this.persistTimer) {
-      clearInterval(this.persistTimer); // legacy cleanup
+      clearInterval(this.persistTimer);
       this.persistTimer = undefined;
     }
     if (this.scheduler && !this.persistenceScheduled) {
@@ -782,7 +765,6 @@ export class SyncService implements ISyncService {
         this.options.persistIntervalMs,
         async () => {
           await this.persistSessions();
-          // Auto-cancel if no active sessions
           if (!this.hasActiveSessions()) {
             this.scheduler.cancelTask(this.persistenceTaskId);
             this.persistenceScheduled = false;
@@ -808,7 +790,7 @@ export class SyncService implements ISyncService {
   private async persistSessions(): Promise<void> {
     for (const s of this.sessions.values()) {
       const last = this.lastPersisted.get(s.id);
-      if (last && s.updatedAt <= last) continue; // no change
+      if (last && s.updatedAt <= last) continue;
       try {
         await this.storageService.saveUploadSession(s);
         this.lastPersisted.set(s.id, new Date());
@@ -819,24 +801,21 @@ export class SyncService implements ISyncService {
   }
 
   async shutdown(): Promise<void> {
-    this.logger.info('SyncService shutdown initiated');
-    // Flush persistence immediately
+    this.logger.info('UploadOrchestrator shutdown initiated');
     try {
       await this.persistSessions();
     } catch (err) {
       this.logger.error('Failed to flush sessions during shutdown', { error: err });
     }
-    // Cancel scheduler task if scheduled
     if (this.persistenceScheduled) {
       this.scheduler.cancelTask(this.persistenceTaskId);
       this.persistenceScheduled = false;
     }
-    // Clear legacy timer if any
     if (this.persistTimer) {
       clearInterval(this.persistTimer);
       this.persistTimer = undefined;
     }
-    this.logger.info('SyncService shutdown complete');
+    this.logger.info('UploadOrchestrator shutdown complete');
   }
 
   private async buildFingerprint(
@@ -896,11 +875,7 @@ export class SyncService implements ISyncService {
     return this.buildFingerprint(file, EFileHashStrategy.NONE, false);
   }
 
-  /**
-   * Recovers sessions persisted as UPLOADING or PENDING at previous shutdown.
-   * Marks them PARTIAL if they had any progress (uploadedFiles > 0) or FAILED otherwise.
-   * Optionally rehydrates in-memory map for future inspection (without auto-resume for now).
-   */
+  /** Recover sessions persisted in uploading/pending state on previous shutdown. */
   async recoverDanglingSessions(): Promise<void> {
     this.logger.info('Recover dangling sessions: start');
     let sessions: IUploadSession[] = [];
@@ -924,12 +899,11 @@ export class SyncService implements ISyncService {
       };
       try {
         await this.storageService.saveUploadSession(updated);
-        // Rehydrate minimal InternalSession snapshot (metrics kept if present)
         const internal: InternalSession = {
           id: updated.id,
           folderPath: updated.folderPath,
           topicId: updated.topicId,
-          channelId: 'unknown', // not persisted currently; future improvement
+          channelId: 'unknown',
           status: updated.status,
           totalFiles: updated.totalFiles,
           uploadedFiles: updated.uploadedFiles,
@@ -947,7 +921,6 @@ export class SyncService implements ISyncService {
           conflictsLogged: updated.conflictsLogged || 0,
         };
         this.sessions.set(updated.id, internal);
-        // Reuse progress event to signal restored state (frontend can interpret status PARTIAL)
         this.socketService?.emit('upload_progress', {
           uploadId: updated.id,
           fileName: updated.currentFile || '',
@@ -967,7 +940,4 @@ export class SyncService implements ISyncService {
   }
 }
 
-// TODO: implement incremental syncFolder diff logic (local vs remote add/remove)
-// TODO: refine status semantics (introduce PARTIAL / separate flag for failed subset)
-// TODO: WebSocket event emissions (progress, completion) via socket service
-// TODO: graceful shutdown hook flushing persistence and clearing timer
+// Legacy alias removed (SyncService). If external code relied on it, reintroduce explicitly elsewhere.

@@ -74,10 +74,11 @@ export interface IFSService {
 }
 
 /**
- * Sync Service Interface
- * Manages file synchronization logic
+ * Upload Orchestrator Interface (formerly ISyncService)
+ * Orchestrates one-way folder -> topic uploads and related incremental sync helpers.
+ * NOTE: Renamed for clarity; use IUploadOrchestrator going forward.
  */
-export interface ISyncService {
+export interface IUploadOrchestrator {
   /**
    * Uploads folder to topic (sequential respecting maxParallelUploads)
    */

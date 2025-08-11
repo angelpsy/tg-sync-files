@@ -4,14 +4,14 @@ import { serviceLoggers } from '../../shared/logger';
 
 import { loadConfig, type AppConfig } from './config/env';
 import { SchedulerService } from './core/services/SchedulerService';
-import { SyncService } from './core/services/SyncService';
+import { UploadOrchestrator } from './core/services/UploadOrchestrator';
 import { FSService } from './infrastructure/fs/FSService';
 import { StorageService } from './infrastructure/storage/StorageService';
 import { TelegramService } from './infrastructure/telegram/TelegramService';
 import { SocketService } from './infrastructure/ws/SocketService';
 
 import type { ISchedulerService, IStorageService } from '@/types/common';
-import type { IFSService, ISyncService } from '@/types/file-sync';
+import type { IFSService, IUploadOrchestrator } from '@/types/file-sync';
 import type { ITelegramService } from '@/types/telegram';
 import type { ISocketService } from '@/types/websocket';
 
@@ -44,7 +44,7 @@ export interface BackendServices {
   telegramService?: ITelegramService;
   socketService: ISocketService;
   scheduler: ISchedulerService;
-  syncService: SyncService & ISyncService;
+  uploadOrchestrator: UploadOrchestrator & IUploadOrchestrator;
   shutdown: () => Promise<void>;
   startedAt: Date;
 }
@@ -85,7 +85,7 @@ export async function createBackendServices(): Promise<BackendServices> {
   const scheduler = new SchedulerService(fsService, storage);
   await scheduler.start();
 
-  const syncService = new SyncService(
+  const uploadOrchestrator = new UploadOrchestrator(
     fsService,
     telegramService as ITelegramService,
     storage,
@@ -93,7 +93,7 @@ export async function createBackendServices(): Promise<BackendServices> {
     socketService,
     { persistIntervalMs: 60_000 }
   );
-  await syncService.recoverDanglingSessions();
+  await uploadOrchestrator.recoverDanglingSessions();
 
   if (hasHealthProvider(socketService)) {
     socketService.setHealthProvider(() => ({
@@ -109,9 +109,9 @@ export async function createBackendServices(): Promise<BackendServices> {
   async function shutdown() {
     logger.info('Backend services shutdown start');
     try {
-      await syncService.shutdown();
+      await uploadOrchestrator.shutdown();
     } catch (e) {
-      logger.error('SyncService shutdown error', { e });
+      logger.error('UploadOrchestrator shutdown error', { e });
     }
     try {
       await scheduler.stop();
@@ -153,7 +153,7 @@ export async function createBackendServices(): Promise<BackendServices> {
     telegramService,
     socketService,
     scheduler,
-    syncService,
+    uploadOrchestrator,
     shutdown,
     startedAt,
   };

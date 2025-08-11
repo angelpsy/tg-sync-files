@@ -283,7 +283,8 @@ export class LoggerFactory {
 export const serviceLoggers = {
   fs: LoggerFactory.createServiceLogger('FS'),
   telegram: LoggerFactory.createServiceLogger('Telegram'),
-  sync: LoggerFactory.createServiceLogger('Sync'),
+  sync: LoggerFactory.createServiceLogger('Sync'), // kept for legacy references
+  upload: LoggerFactory.createServiceLogger('Upload'),
   storage: LoggerFactory.createServiceLogger('Storage'),
   socket: LoggerFactory.createServiceLogger('Socket'),
   scheduler: LoggerFactory.createServiceLogger('Scheduler'),

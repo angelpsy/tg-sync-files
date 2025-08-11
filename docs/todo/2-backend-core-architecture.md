@@ -21,9 +21,9 @@
 
 - [x] Выносить все public DTO/интерфейсы в корневую папку `/types`
 - [x] Расширить существующие типы в `/types/index.ts` и создать доменные
-      интерфейсы:
-  - `IFSService`, `ISyncService`, `ITelegramService`, `IStorageService`,
-    `ISocketService`, `ISchedulerService`
+      интерфейсы: - `IFSService`, `IUploadOrchestrator` (ранее `ISyncService`),
+      `ITelegramService`, `IStorageService`, `ISocketService`,
+      `ISchedulerService`
 - [x] Создать папку `/backend/src/core/interfaces/` для внутренних интерфейсов
 - [x] Описать следующие интерфейсы с методами и типами данных:
   - **IFSService:**
@@ -34,7 +34,7 @@
     - `onUpdate(callback: (tree: FolderTree[]) => void): void` — подписка на
       события обновления
     - `forceScan(): Promise<FolderTree[]>` — принудительное сканирование
-  - **ISyncService:**
+      - **IUploadOrchestrator (ранее ISyncService):**
     - `uploadFolderToTopic(folderPath: string, topicName: string): Promise<UploadResult>`
     - `checkDuplicates(folderPath: string, topicName: string): Promise<boolean>`
     - `getUploadStatus(topicId: string): Promise<UploadStatus>`
@@ -107,7 +107,7 @@
       его границы (перенесено в `docs/architecture.md`)
 - [x] Реализовать retry с экспоненциальной задержкой (параметры в конфиге)
 
-## 2.5. SyncService
+## 2.5. UploadOrchestrator (ранее SyncService)
 
 - [x] Создать `/backend/src/core/services/SyncService.ts`
 - [x] In-memory статус загрузок (Map sessionId -> session)
@@ -166,7 +166,7 @@
    - [x] hasFailures помечен как deprecated (обратная совместимость)
    - [ ] Обновить consumer-код frontend на использование status === 'partial'
 
-### 2.5.2. Post-MVP хвосты SyncService
+### 2.5.2. Post-MVP хвосты UploadOrchestrator
 
 Must have:
 
@@ -176,11 +176,13 @@ Must have:
    явно зафиксировать, что они вычисляются только in-memory.
 3. Очистка завершённых сессий из памяти (LRU / TTL, напр. >24h) чтобы не расти
    бесконечно.
-4. Удалить устаревшие TODO в конце `SyncService.ts` (часть уже реализована).
+4. Удалить устаревшие TODO в конце `UploadOrchestrator.ts` (часть уже
+   реализована).
 5. Конфигурируемый `maxParallelUploads` > 1: очередь + ограничение
    параллельности.
-6. Retry / backoff на уровне SyncService для uploadFile (если TelegramService не
-   гарантирует внутренние ретраи) с лимитом попыток и классификацией ошибок.
+6. Retry / backoff на уровне UploadOrchestrator для uploadFile (если
+   TelegramService не гарантирует внутренние ретраи) с лимитом попыток и
+   классификацией ошибок.
 7. Тесты (unit):
    - buildFingerprint/hash strategies
    - conflict rename генерация

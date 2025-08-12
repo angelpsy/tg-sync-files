@@ -17,9 +17,15 @@ class WSClient {
   private onMessageHandlers = new Set<MessageHandler>();
   private onConnectHandlers = new Set<() => void>();
   private onDisconnectHandlers = new Set<(reason?: string) => void>();
+  private onAnyHandlers = new Set<(event: string, payload: unknown) => void>();
+  private onOutgoingHandlers = new Set<(event: string, payload: unknown) => void>();
+  private messagesIn = 0;
+  private messagesOut = 0;
 
   /** Emit a typed event to the server */
   emit<E extends TEventName>(event: E, payload: EventPayloadMap[E]): void {
+    this.messagesOut += 1;
+    this.onOutgoingHandlers.forEach(h => h(event as string, payload as unknown));
     this.socket?.emit(event as string, payload as unknown);
   }
 
@@ -55,6 +61,13 @@ class WSClient {
         this.onMessageHandlers.forEach(h => h(data));
       }
     });
+
+    // Any incoming event observer and counter
+    this.socket.onAny((event: string, ...args: unknown[]) => {
+      const payload = args[0];
+      this.messagesIn += 1;
+      this.onAnyHandlers.forEach(h => h(event, payload));
+    });
   }
 
   disconnect() {
@@ -75,6 +88,23 @@ class WSClient {
   onDisconnect(handler: (reason?: string) => void) {
     this.onDisconnectHandlers.add(handler);
     return () => this.onDisconnectHandlers.delete(handler);
+  }
+
+  /** Subscribe to ANY incoming event */
+  onAny(handler: (event: string, payload: unknown) => void) {
+    this.onAnyHandlers.add(handler);
+    return () => this.onAnyHandlers.delete(handler);
+  }
+
+  /** Subscribe to ANY outgoing emit (via wsClient.emit) */
+  onOutgoing(handler: (event: string, payload: unknown) => void) {
+    this.onOutgoingHandlers.add(handler);
+    return () => this.onOutgoingHandlers.delete(handler);
+  }
+
+  /** Stats snapshot */
+  getStats() {
+    return { messagesIn: this.messagesIn, messagesOut: this.messagesOut } as const;
   }
 }
 

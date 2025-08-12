@@ -7,7 +7,7 @@ WebSocket-коммуникации, основанный на документа
 
 - [x] Next.js App Router в `/frontend` (TypeScript)
 - [x] TailwindCSS базовая настройка, токены и глобальные стили
-- [ ] Установить shadcn/ui и сгенерировать базовые компоненты (Button, Card,
+- [x] Установить shadcn/ui и сгенерировать базовые компоненты (Button, Card,
       Badge, Tabs, Alert)
 - [ ] ESLint/Prettier в монорепо выровнять (исключить конфликт плагина `import`,
       включить `eslint-config-next` локально)
@@ -61,7 +61,7 @@ Acceptance:
 - [x] Скелет каталогов: `/frontend/shared`, `/frontend/entities`,
       `/frontend/features`, `/frontend/widgets`
 - [x] `/shared/api/ws` — клиент и протокол (базовые)
-- [ ] `/shared/api/http` — health (минимум)
+- [x] `/shared/api/http` — health (минимум)
 - [x] `/shared/lib/providers/SocketProvider` — контекст соединения
 - [ ] `/shared/lib/notifications` — toasts/alerts для ошибок и статусов
 - [ ] `/shared/ui` — базовые компоненты (shadcn/ui) и компоновки

@@ -6,10 +6,12 @@ import { createServer } from 'node:http';
 import { resolve } from 'path';
 
 import { config } from 'dotenv';
+import { expand } from 'dotenv-expand';
 import { Server } from 'socket.io';
 
-// Load environment variables from root .env file
-config({ path: resolve(process.cwd(), '../.env') });
+// Load environment variables from root .env file and expand nested vars
+const env = config({ path: resolve(process.cwd(), '../.env') });
+expand(env);
 
 // Temporary types for testing (will be moved to shared types later)
 interface FileSyncEvent {

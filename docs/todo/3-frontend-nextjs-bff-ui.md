@@ -38,8 +38,8 @@ Acceptance:
 
 ## 3.3. WebSocket клиент и протокол
 
-- [ ] `shared/api/ws/client.ts`: Socket.IO клиент, опции, бэкофф, логи
-- [ ] `shared/api/ws/protocol.ts`: handshake с `WS_PROTOCOL_VERSION` (из
+- [x] `shared/api/ws/client.ts`: Socket.IO клиент (базовый), опции
+- [x] `shared/api/ws/protocol.ts`: handshake с `WS_PROTOCOL_VERSION` (из
       `types/websocket/events.ts`), capability flags, версия клиента
 - [ ] `shared/api/ws/events.ts`: типизированные on/emit по `EventPayloadMap`
 - [ ] Heartbeat/ping-pong; idle-timeout; reconnection policy (exponential
@@ -60,9 +60,9 @@ Acceptance:
 
 - [x] Скелет каталогов: `/frontend/shared`, `/frontend/entities`,
       `/frontend/features`, `/frontend/widgets`
-- [ ] `/shared/api/ws` — клиент, протокол, команды, подписки
+- [x] `/shared/api/ws` — клиент и протокол (базовые)
 - [ ] `/shared/api/http` — health (минимум)
-- [ ] `/shared/lib/providers/SocketProvider` — контекст соединения
+- [x] `/shared/lib/providers/SocketProvider` — контекст соединения
 - [ ] `/shared/lib/notifications` — toasts/alerts для ошибок и статусов
 - [ ] `/shared/ui` — базовые компоненты (shadcn/ui) и компоновки
 
@@ -104,8 +104,7 @@ Acceptance:
 
 ## 3.7. Widgets слой (FSD)
 
-- [ ] `widgets/ws-status`: индикатор соединения и счетчики (messagesIn/out,
-      drops)
+- [x] `widgets/ws-status`: индикатор соединения (базовый); счётчики — позже
 - [ ] `widgets/event-feed`: лента последних событий (`file_sync_*`, `upload_*`,
       `channel_status_update`)
 - [ ] `widgets/folder-tree`: обзор локальной ФС

@@ -19,7 +19,8 @@
       "@/components/*": ["./components/*"],
       "@/lib/*": ["./lib/*"],
       "@/app/*": ["./app/*"],
-      "@/types": ["../types"]
+      "@/types": ["../types"],
+      "@/types/*": ["../types/*"]
     }
   },
   "include": [

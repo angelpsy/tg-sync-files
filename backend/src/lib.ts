@@ -10,10 +10,16 @@ import { StorageService } from './infrastructure/storage/StorageService';
 import { TelegramService } from './infrastructure/telegram/TelegramService';
 import { SocketService } from './infrastructure/ws/SocketService';
 
-import type { ISchedulerService, IStorageService } from '@/types/common';
-import type { IFSService, IUploadOrchestrator } from '@/types/file-sync';
-import type { ITelegramService } from '@/types/telegram';
-import type { ISocketService } from '@/types/websocket';
+import type {
+  EventPayloadMap,
+  IFolderTree,
+  IFSService,
+  ISchedulerService,
+  ISocketService,
+  IStorageService,
+  ITelegramService,
+  IUploadOrchestrator,
+} from '@/types';
 
 function hasDestroy(svc: unknown): svc is { destroy: () => Promise<void> } {
   return (
@@ -82,8 +88,56 @@ export async function createBackendServices(): Promise<BackendServices> {
   });
   await socketService.initialize();
 
+  // Wire FS updates to WS events and start watcher
+  let lastTrees: IFolderTree[] | undefined;
+  fsService.onUpdate(trees => {
+    lastTrees = trees;
+    try {
+      socketService.emit(
+        'folder_tree_update',
+        trees as unknown as EventPayloadMap['folder_tree_update']
+      );
+    } catch (e) {
+      logger.error('Emit folder_tree_update failed', { error: e });
+    }
+  });
+  // Start watching configured paths
+  for (const p of config.watchPaths) {
+    try {
+      await fsService.watchFolder(p);
+    } catch (e) {
+      logger.error('watchFolder failed', { path: p, error: e });
+    }
+  }
+  // Initial scan and emit
+  try {
+    lastTrees = await fsService.scanFolders();
+    socketService.emit(
+      'folder_tree_update',
+      lastTrees as unknown as EventPayloadMap['folder_tree_update']
+    );
+  } catch (e) {
+    logger.error('Initial scan failed', { error: e });
+  }
+
+  // Send current tree to newly connected clients
+  socketService.onClientConnect(clientId => {
+    if (!lastTrees) return;
+    try {
+      // Emit to all for simplicity; optimization to target client would require sendToClient-event mapping
+      socketService.emit(
+        'folder_tree_update',
+        lastTrees as unknown as EventPayloadMap['folder_tree_update']
+      );
+    } catch (e) {
+      logger.error('Emit on connect failed', { clientId, error: e });
+    }
+  });
+
   const scheduler = new SchedulerService(fsService, storage);
   await scheduler.start();
+  // Periodic re-scan to catch missed changes and update cache (e.g., every 30s)
+  scheduler.scheduleFileScan(30_000);
 
   const uploadOrchestrator = new UploadOrchestrator(
     fsService,

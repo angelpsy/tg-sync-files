@@ -16,6 +16,7 @@
     "dev:backend": "pnpm --filter backend dev",
     "dev:frontend": "pnpm --filter frontend dev",
     "dev": "pnpm run dev:backend & pnpm run dev:frontend",
+    "prod:backend": "pnpm --filter backend build && pnpm --filter backend start",
     "build": "pnpm --filter backend build && pnpm --filter frontend build",
     "build:types": "pnpm --filter types build",
     "build:docker": "docker compose build",

@@ -1,4 +1,6 @@
 import { EventFeed } from '@/widgets/event-feed/EventFeed';
+import { FolderTree } from '@/widgets/folder-tree/FolderTree';
+import { TopicsDashboard } from '@/widgets/topics-dashboard/TopicsDashboard';
 
 export default function HomePage() {
   return (
@@ -8,6 +10,11 @@ export default function HomePage() {
         <p className="text-lg text-muted-foreground mb-6">
           Manage sync, monitor events, and control actions via WebSocket.
         </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <TopicsDashboard />
+        <FolderTree />
       </div>
 
       <EventFeed />

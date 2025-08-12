@@ -19,6 +19,8 @@ class WSClient {
   private onDisconnectHandlers = new Set<(reason?: string) => void>();
   private onAnyHandlers = new Set<(event: string, payload: unknown) => void>();
   private onOutgoingHandlers = new Set<(event: string, payload: unknown) => void>();
+  // Keep persistent event subscriptions regardless of socket state
+  private eventHandlers = new Map<string, Set<(payload: unknown) => void>>();
   private messagesIn = 0;
   private messagesOut = 0;
 
@@ -34,9 +36,26 @@ class WSClient {
     event: E,
     handler: (payload: EventPayloadMap[E]) => void
   ): () => void {
+    const ev = event as string;
     const wrapped = (payload: unknown) => handler(payload as EventPayloadMap[E]);
-    this.socket?.on(event as string, wrapped as (...args: any[]) => void);
-    return () => this.socket?.off(event as string, wrapped as (...args: any[]) => void);
+    // Store handler persistently
+    let set = this.eventHandlers.get(ev);
+    if (!set) {
+      set = new Set();
+      this.eventHandlers.set(ev, set);
+    }
+    set.add(wrapped);
+    // If socket is active, bind immediately
+    this.socket?.on(ev, wrapped as (...args: unknown[]) => unknown);
+    // Unsubscribe removes from registry and socket
+    return () => {
+      const s = this.eventHandlers.get(ev);
+      if (s) {
+        s.delete(wrapped);
+        if (s.size === 0) this.eventHandlers.delete(ev);
+      }
+      this.socket?.off(ev, wrapped as (...args: unknown[]) => unknown);
+    };
   }
 
   connect(opts: WSClientOptions) {
@@ -50,7 +69,15 @@ class WSClient {
       auth: opts.authToken ? { token: opts.authToken } : undefined,
     });
 
-    this.socket.on('connect', () => this.onConnectHandlers.forEach(h => h()));
+    this.socket.on('connect', () => {
+      // Re-bind all persistent event handlers on (re)connect
+      this.eventHandlers.forEach((handlers, ev) => {
+        handlers.forEach(h => {
+          this.socket?.on(ev, h as (...args: unknown[]) => unknown);
+        });
+      });
+      this.onConnectHandlers.forEach(h => h());
+    });
     this.socket.on('disconnect', reason => this.onDisconnectHandlers.forEach(h => h(reason)));
     this.socket.on('connect_error', () =>
       this.onDisconnectHandlers.forEach(h => h('connect_error'))

@@ -1,5 +1,5 @@
 import { readdir, stat } from 'fs/promises';
-import { join, relative } from 'path';
+import { basename, join, relative } from 'path';
 
 import chokidar from 'chokidar';
 
@@ -114,7 +114,8 @@ export class FSService implements IFSService {
     this.logger.info('Starting file watcher', { path: folderPath });
 
     this.watcher = chokidar.watch(folderPath, {
-      ignored: [...this.options.ignoredFolders, ...this.options.ignoredFiles],
+      // Ignore configured patterns + system .DS_Store files
+      ignored: [...this.options.ignoredFolders, ...this.options.ignoredFiles, '**/.DS_Store'],
       persistent: true,
       ignoreInitial: true,
       depth: this.options.maxDepth,
@@ -281,6 +282,11 @@ export class FSService implements IFSService {
    */
   private shouldIgnore(fullPath: string, basePath: string): boolean {
     const relativePath = relative(basePath, fullPath);
+
+    // Always ignore macOS Finder metadata files
+    if (basename(fullPath) === '.DS_Store' || relativePath.endsWith('/.DS_Store')) {
+      return true;
+    }
 
     // Проверяем игнорируемые папки и файлы
     for (const pattern of [...this.options.ignoredFolders, ...this.options.ignoredFiles]) {

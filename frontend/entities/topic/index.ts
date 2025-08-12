@@ -1,2 +1,2 @@
-export * from './useTopics';
 export * from './useRenameTopic';
+export * from './useTopics';

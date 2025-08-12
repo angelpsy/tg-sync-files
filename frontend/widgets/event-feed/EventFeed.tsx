@@ -1,6 +1,6 @@
 'use client';
-import type { TEventName, EventPayloadMap } from '@/types/websocket/events';
-import React, { useEffect, useMemo, useState } from 'react';
+import type { EventPayloadMap, TEventName } from '@/types/websocket/events';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

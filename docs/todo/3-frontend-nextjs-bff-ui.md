@@ -38,10 +38,11 @@ Acceptance:
 
 ## 3.3. WebSocket клиент и протокол
 
-- [x] `shared/api/ws/client.ts`: Socket.IO клиент (базовый), опции
+- [x] `shared/api/ws/client.ts`: Socket.IO клиент (базовый), опции, постоянные
+      подписки с ребиндингом при reconnect
 - [x] `shared/api/ws/protocol.ts`: handshake с `WS_PROTOCOL_VERSION` (из
       `types/websocket/events.ts`), capability flags, версия клиента
-- [ ] `shared/api/ws/events.ts`: типизированные on/emit по `EventPayloadMap`
+- [x] `shared/api/ws/events.ts`: типизированные on/emit по `EventPayloadMap`
 - [ ] Heartbeat/ping-pong; idle-timeout; reconnection policy (exponential
       backoff + jitter)
 - [ ] Rate limit UI: счётчики drop/second, отображение предупреждений
@@ -72,8 +73,8 @@ Acceptance:
 
 ## 3.5. Entities слой (FSD)
 
-- [ ] `entities/folder`: модели (FolderTree), хуки на чтение (из WS
-      `folder_tree_update`), отображение дерева
+- [x] `entities/folder`: модели (FolderTree), хуки на чтение (из WS
+      `folder_tree_update`), отображение дерева + diff/highlight изменений
 - [ ] `entities/topic`: модели (Topic), хуки на чтение и переименование,
       валидации имён
 - [ ] `entities/channel`: список каналов и их статус (`channel_status_update`)
@@ -105,10 +106,11 @@ Acceptance:
 ## 3.7. Widgets слой (FSD)
 
 - [x] `widgets/ws-status`: индикатор соединения (базовый); счётчики — позже
-- [ ] `widgets/event-feed`: лента последних событий (`file_sync_*`, `upload_*`,
+- [x] `widgets/event-feed`: лента последних событий (`file_sync_*`, `upload_*`,
       `channel_status_update`)
-- [ ] `widgets/folder-tree`: обзор локальной ФС
-- [ ] `widgets/topics-dashboard`: список топиков и краткие статусы
+- [x] `widgets/folder-tree`: обзор локальной ФС, раскрытие/сворачивание,
+      подсветка обновлений, управление скрытием файлов (per-folder и глобально)
+- [x] `widgets/topics-dashboard`: список топиков и краткие статусы (заготовка)
 
 Acceptance:
 
@@ -117,7 +119,7 @@ Acceptance:
 
 ## 3.8. Pages (App Router)
 
-- [ ] `/` Dashboard: ws-status, event-feed, быстрые действия
+- [x] `/` Dashboard: ws-status, event-feed, быстрые действия (MVP)
 - [ ] `/local-to-tg` (Local => TG): folder-tree + link + upload
 - [ ] `/tg-to-local` (TG => Local): topics + download
 - [ ] `/settings`: каналы, базовая директория

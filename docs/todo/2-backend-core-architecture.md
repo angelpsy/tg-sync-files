@@ -78,7 +78,7 @@
 
 - [x] Создать `/backend/src/infrastructure/fs/FSService.ts`
 - [x] Реализовать сканирование и watcher (chokidar) - только реакция на события
-      FS
+      FS (исключая `.DS_Store`)
 - [x] Определить опции watcher: глубина сканирования, игнорируемые папки, файлы
 - [x] Обновление дерева при изменениях файловой системы
 - [x] Отправка событий через `ISocketService` при обнаружении изменений
@@ -305,6 +305,8 @@ Out of scope сейчас:
 ## 2.8. Композиция приложения
 
 - [x] `/backend/src/lib.ts` с `createBackendServices` и сервис-фабрикой
+      (инициал. скан, периодические сканы, эмит `folder_tree_update` при
+      старте/изменениях/для новых клиентов)
 - [x] `/backend/src/index.ts` экспорты интерфейсов и типов для frontend
 - [x] Создать `/backend/src/core/services/SchedulerService.ts`:
   - [x] Периодическое сканирование FS (каждые 60 сек)
@@ -314,6 +316,7 @@ Out of scope сейчас:
 - [x] Graceful shutdown для всех сервисов (WebSocket, DB connections, file
       watchers, scheduler)
 - [x] Environment validation и конфигурационный слой (`config/env.ts` + zod)
+      (загрузка из корневого `.env`, парсинг WATCH_PATHS/PORT)
 - [x] Health check endpoint (`/health` on WS HTTP server)
 
 ## 2.9. Дополнительные задачи (пропущенные ранее)

@@ -5,7 +5,8 @@ import dotenvExpand from 'dotenv-expand';
 import { z } from 'zod';
 
 // Load + expand .env early (idempotent if already loaded elsewhere)
-const envResult = dotenvConfig({ path: resolve(process.cwd(), '.env') });
+// Monorepo policy: use root .env (one level up from backend/)
+const envResult = dotenvConfig({ path: resolve(process.cwd(), '../.env') });
 dotenvExpand.expand(envResult);
 
 const EnvSchema = z.object({

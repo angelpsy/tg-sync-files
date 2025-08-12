@@ -20,6 +20,7 @@ import type {
   ITelegramService,
   IUploadOrchestrator,
 } from '@/types';
+import type { TEventName } from '@/types/websocket/events';
 
 function hasDestroy(svc: unknown): svc is { destroy: () => Promise<void> } {
   return (
@@ -40,6 +41,15 @@ function hasShutdown(
   svc: ISocketService
 ): svc is ISocketService & { shutdown: () => Promise<void> } {
   return typeof (svc as { shutdown?: unknown }).shutdown === 'function';
+}
+
+function hasInbound(svc: ISocketService): svc is ISocketService & {
+  onInbound: <E extends TEventName>(
+    event: E,
+    handler: (clientId: string, payload: EventPayloadMap[E]) => void
+  ) => void;
+} {
+  return typeof (svc as { onInbound?: unknown }).onInbound === 'function';
 }
 
 export interface BackendServices {
@@ -133,6 +143,124 @@ export async function createBackendServices(): Promise<BackendServices> {
       logger.error('Emit on connect failed', { clientId, error: e });
     }
   });
+
+  // Telegram data snapshots and requests
+  // Emit channels snapshot on client connect if Telegram is available
+  // Telegram channels/topics/files WS API
+  if (telegramService) {
+    socketService.onClientConnect(async clientId => {
+      try {
+        const channels = await telegramService.getChannels();
+        socketService.emit('channels_snapshot', channels);
+      } catch (e) {
+        logger.error('channels_snapshot emit failed', { clientId, error: e });
+      }
+    });
+
+    if (hasInbound(socketService)) {
+      // request_channels
+      socketService.onInbound('request_channels', async cid => {
+        try {
+          const channels = await telegramService.getChannels();
+          socketService.emit('channels_snapshot', channels);
+        } catch (e) {
+          logger.error('request_channels failed', { cid, error: e });
+        }
+      });
+      // request_topics { channelId }
+      socketService.onInbound('request_topics', async (cid, payload: { channelId: string }) => {
+        try {
+          const topics = await telegramService.getTopics(payload.channelId);
+          socketService.emit('topics_snapshot', { channelId: payload.channelId, topics });
+        } catch (e) {
+          logger.error('request_topics failed', { cid, payload, error: e });
+        }
+      });
+      // request_topic_files { topicId }
+      socketService.onInbound('request_topic_files', async (cid, payload: { topicId: string }) => {
+        try {
+          // Try to find channel id for this topic via probing topics across channels
+          const chans = await telegramService.getChannels();
+          let foundChannelId: string | undefined;
+          for (const ch of chans) {
+            try {
+              const ts = await telegramService.getTopics(ch.id);
+              if (ts.some(t => t.id === payload.topicId)) {
+                foundChannelId = ch.id;
+                break;
+              }
+            } catch {
+              // ignore per-channel errors
+            }
+          }
+          if (!foundChannelId) throw new Error('Channel for topic not found');
+          await telegramService.listTopicFiles(foundChannelId, payload.topicId);
+          // Persisted records and original folders
+          const records = await storage.getTopicFileRecords(payload.topicId);
+          const originalFolders = Array.from(new Set(records.map(r => r.folderPath)));
+          socketService.emit('topic_files_snapshot', {
+            topicId: payload.topicId,
+            records,
+            originalFolders,
+          } as unknown as EventPayloadMap['topic_files_snapshot']);
+        } catch (e) {
+          logger.error('request_topic_files failed', { cid, payload, error: e });
+        }
+      });
+    }
+  } else {
+    // Fallback: serve channels from env if provided
+    if (Array.isArray(config.channelIds) && config.channelIds.length > 0) {
+      socketService.onClientConnect(clientId => {
+        try {
+          const channels = (config.channelIds as string[]).map((id: string) => ({
+            id,
+            title: id,
+            name: id,
+            username: undefined,
+            accessHash: undefined,
+            isGroup: false,
+            isForum: true,
+            participantsCount: 0,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }));
+          socketService.emit(
+            'channels_snapshot',
+            channels as unknown as EventPayloadMap['channels_snapshot']
+          );
+        } catch (e) {
+          logger.error('env channels emit failed', { clientId, error: e });
+        }
+      });
+      if (hasInbound(socketService)) {
+        socketService.onInbound('request_channels', cid => {
+          try {
+            const channels = (config.channelIds as string[]).map((id: string) => ({
+              id,
+              title: id,
+              name: id,
+              username: undefined,
+              accessHash: undefined,
+              isGroup: false,
+              isForum: true,
+              participantsCount: 0,
+              isActive: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }));
+            socketService.emit(
+              'channels_snapshot',
+              channels as unknown as EventPayloadMap['channels_snapshot']
+            );
+          } catch (e) {
+            logger.error('env request_channels failed', { cid, error: e });
+          }
+        });
+      }
+    }
+  }
 
   const scheduler = new SchedulerService(fsService, storage);
   await scheduler.start();

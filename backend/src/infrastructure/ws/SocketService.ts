@@ -31,6 +31,10 @@ export class SocketService implements ISocketService {
   private disconnectionHandlers = new Set<(c: IWSConnectionInfo) => void>();
   private messageHandlers = new Set<(clientId: string, msg: IWSMessage<unknown>) => void>();
   private clientConnectHandlers = new Set<(clientId: string) => void>();
+  private inboundEventHandlers = new Map<
+    string,
+    Set<(clientId: string, payload: unknown) => void>
+  >();
 
   private startedAt: Date = new Date();
   private messagesIn = 0;
@@ -127,6 +131,21 @@ export class SocketService implements ISocketService {
         this.logger.error('Message handler error', { error: e });
       }
     });
+    // Custom inbound events (client -> server)
+    socket.onAny((event: string, ...args: unknown[]) => {
+      if (event === 'message') return; // handled above
+      const handlers = this.inboundEventHandlers.get(event);
+      if (!handlers || handlers.size === 0) return;
+      const payload = args[0];
+      this.messagesIn++;
+      if (this.enforceRateLimit(socket.id)) return;
+      try {
+        handlers.forEach(h => h(socket.id, payload));
+      } catch (e) {
+        this.errors++;
+        this.logger.error('Inbound handler error', { event, error: e });
+      }
+    });
     socket.on('disconnect', reason => {
       this.disconnectionHandlers.forEach(h => h(info));
       this.logger.info('Client disconnected', { id: socket.id, reason });
@@ -194,6 +213,26 @@ export class SocketService implements ISocketService {
   }
   offClientConnect(handler: (clientId: string) => void): void {
     this.clientConnectHandlers.delete(handler);
+  }
+
+  /** Register inbound (client -> server) event handler */
+  onInbound<E extends TEventName>(
+    event: E,
+    handler: (clientId: string, payload: EventPayloadMap[E]) => void
+  ): void {
+    let set = this.inboundEventHandlers.get(event);
+    if (!set) {
+      set = new Set();
+      this.inboundEventHandlers.set(event, set);
+    }
+    set.add(handler as (clientId: string, payload: unknown) => void);
+  }
+  offInbound<E extends TEventName>(
+    event: E,
+    handler: (clientId: string, payload: EventPayloadMap[E]) => void
+  ): void {
+    const set = this.inboundEventHandlers.get(event);
+    if (set) set.delete(handler as (clientId: string, payload: unknown) => void);
   }
 
   setHealthProvider(fn: () => unknown): void {

@@ -14,6 +14,7 @@ const EnvSchema = z.object({
   BACKEND_WS_PORT: z.string().optional(),
   TELEGRAM_API_ID: z.string().optional(),
   TELEGRAM_API_HASH: z.string().optional(),
+  TELEGRAM_CHANNEL_IDS: z.string().optional(),
   WATCH_PATHS: z.string().optional(),
   WATCH_DIR: z.string().optional(), // legacy / single dir variant
 });
@@ -26,6 +27,7 @@ export interface AppConfig {
   telegramApiId?: number;
   telegramApiHash?: string;
   watchPaths: string[];
+  channelIds?: string[];
 }
 
 export function loadConfig(): AppConfig {
@@ -34,6 +36,11 @@ export function loadConfig(): AppConfig {
   const telegramApiId = parsed.TELEGRAM_API_ID ? parseInt(parsed.TELEGRAM_API_ID, 10) : undefined;
   const telegramApiHash = parsed.TELEGRAM_API_HASH;
   let watchPaths: string[] = [];
+  const channelIds = parsed.TELEGRAM_CHANNEL_IDS
+    ? parsed.TELEGRAM_CHANNEL_IDS.split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+    : undefined;
   if (parsed.WATCH_PATHS) {
     watchPaths = parsed.WATCH_PATHS.split(',')
       .map(s => s.trim())
@@ -47,5 +54,6 @@ export function loadConfig(): AppConfig {
     telegramApiId: telegramApiId && Number.isFinite(telegramApiId) ? telegramApiId : undefined,
     telegramApiHash,
     watchPaths,
+    channelIds,
   };
 }

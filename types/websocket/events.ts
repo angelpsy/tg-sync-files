@@ -3,6 +3,7 @@
  */
 
 import type {
+  IFileRecord,
   IFileSyncEvent,
   ISyncDiffResult,
   IUploadCompleteEvent,
@@ -11,7 +12,7 @@ import type {
   IUploadProgress,
   IUploadStartEvent,
 } from '../file-sync/index.js';
-import type { IChannelStatus } from '../telegram/index.js';
+import type { IChannelStatus, ITelegramChannel, ITopic } from '../telegram/index.js';
 
 // Protocol version for WS messages (bump when breaking wire changes occur)
 export const WS_PROTOCOL_VERSION = 1 as const;
@@ -34,6 +35,14 @@ export const EventNames = [
   // FS / system
   'folder_tree_update',
   'channel_status_update',
+  // Telegram data snapshots
+  'channels_snapshot',
+  'topics_snapshot',
+  'topic_files_snapshot',
+  // Client requests (inbound)
+  'request_channels',
+  'request_topics',
+  'request_topic_files',
 ] as const;
 
 export type TEventName = (typeof EventNames)[number];
@@ -52,6 +61,14 @@ export interface EventPayloadMap {
   sync_diff: ISyncDiffResult;
   folder_tree_update: unknown; // Provided by FS layer (tree snapshot)
   channel_status_update: IChannelStatus;
+  // Snapshots
+  channels_snapshot: ITelegramChannel[];
+  topics_snapshot: { channelId: string; topics: ITopic[] };
+  topic_files_snapshot: { topicId: string; records: IFileRecord[]; originalFolders: string[] };
+  // Requests (client -> server)
+  request_channels: Record<string, never>;
+  request_topics: { channelId: string };
+  request_topic_files: { topicId: string };
 }
 
 // Helper generic for narrowing payload type

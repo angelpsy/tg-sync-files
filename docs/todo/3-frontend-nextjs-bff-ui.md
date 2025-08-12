@@ -1,57 +1,153 @@
-# 3. Frontend (Next.js BFF + UI)
+# 3. Frontend (Next.js BFF + UI, WS-first)
 
-## 3.1. Инициализация Next.js проекта как BFF
+Ниже — детальный пошаговый план реализации UI c приоритетом
+WebSocket-коммуникации, основанный на документах specification и architecture.
 
-- [ ] Инициализировать Next.js в `/frontend` (TS, App Router)
-- [ ] Установить shadcn/ui, TailwindCSS
-- [ ] Настроить ESLint/Prettier из корневых конфигов
-- [ ] Установить NextAuth.js и настроить custom provider (StringSession в
-      cookie)
+## 3.1. Bootstrap и базовая инфраструктура
 
-## 3.2. Next.js API Routes (BFF)
+- [x] Next.js App Router в `/frontend` (TypeScript)
+- [x] TailwindCSS базовая настройка, токены и глобальные стили
+- [ ] Установить shadcn/ui и сгенерировать базовые компоненты (Button, Card,
+      Badge, Tabs, Alert)
+- [ ] ESLint/Prettier в монорепо выровнять (исключить конфликт плагина `import`,
+      включить `eslint-config-next` локально)
 
-- [ ] Создать `/frontend/src/app/api/topics/route.ts`
-- [ ] `/files`, `/folders`, `/sync`, `/download`
-- [ ] Импорт handlers из `backend/src/index.ts`
-- [x] Адаптеры запрос/ответ, валидация, универсальное логирование (Pino)
+Примечание: Для авторизации NextAuth не нужен. Аутентификация Telegram
+выполняется по WebSocket (phone/code/password), без HTTP-cookie-сессии.
 
-## 3.3. WebSocket клиент
+Acceptance:
 
-- [ ] Хук `useSocket` для подключения
-- [ ] Реализовать глобальное состояние и аутентификацию через React Context +
-      hooks
-- [ ] Обработчики событий: `upload:*`, `download:*`, `fs:update`, `status`
-- [ ] Реконнект, обработка ошибок
+- Dev и prod сборки проходят; базовые компоненты доступны; линтер без
+  блокирующих ошибок.
+
+## 3.2. BFF по HTTP (минимум) — WS-first
+
+- [x] `/app/api/health` — версия + uptime
+- [ ] Read-only SSR endpoints для гидратации (например, список каналов)
+- [ ] Проксирование/интеграция с backend-хендлерами по мере необходимости
+
+Примечание: Все бизнес-операции (scan/upload/download/rename/link, а также auth)
+— через WebSocket. `/app/api/download` не требуется: «download» в терминах
+приложения — выгрузка из Telegram на локальный диск сервера (через backend и
+FS), а не отдача файла браузеру. Если когда-либо потребуется скачивание файла в
+браузер, добавим отдельный HTTP-роут позже.
+
+Acceptance:
+
+- Health доступен. Остальные роуты заглушены или возвращают корректные ошибки.
+
+## 3.3. WebSocket клиент и протокол
+
+- [ ] `shared/api/ws/client.ts`: Socket.IO клиент, опции, бэкофф, логи
+- [ ] `shared/api/ws/protocol.ts`: handshake с `WS_PROTOCOL_VERSION` (из
+      `types/websocket/events.ts`), capability flags, версия клиента
+- [ ] `shared/api/ws/events.ts`: типизированные on/emit по `EventPayloadMap`
+- [ ] Heartbeat/ping-pong; idle-timeout; reconnection policy (exponential
+      backoff + jitter)
+- [ ] Rate limit UI: счётчики drop/second, отображение предупреждений
+- [ ] Auth по WS: команды и события
+  - Команды UI → Backend: `auth_init { phone }`, `auth_code { code }`, (опц.)
+    `auth_password { password }`
+  - Ответы Backend → UI: `auth_pending_code`, `auth_pending_password`,
+    `auth_success { maskedPhone }`, `auth_error { code, message }`
+
+Acceptance:
+
+- При запуске UI устанавливается соединение; при отключении — авто-реконнект;
+  `protocolVersion` совпадает; события типизированы.
 
 ## 3.4. Shared слой (FSD)
 
-- [ ] `/frontend/src/shared/api` — HTTP & WS клиенты, типы
-- [ ] Добавить контекст AuthenticationContext и StateContext в
-      `/frontend/src/shared/lib`
-- [ ] `/frontend/src/shared/ui` — shadcn/ui базовые компоненты
-- [ ] `/frontend/src/shared/lib` — утилиты и хуки
+- [x] Скелет каталогов: `/frontend/shared`, `/frontend/entities`,
+      `/frontend/features`, `/frontend/widgets`
+- [ ] `/shared/api/ws` — клиент, протокол, команды, подписки
+- [ ] `/shared/api/http` — health (минимум)
+- [ ] `/shared/lib/providers/SocketProvider` — контекст соединения
+- [ ] `/shared/lib/notifications` — toasts/alerts для ошибок и статусов
+- [ ] `/shared/ui` — базовые компоненты (shadcn/ui) и компоновки
+
+Acceptance:
+
+- Доступны хелперы/провайдер для подключения и UI-нотификации ошибок.
 
 ## 3.5. Entities слой (FSD)
 
-- [ ] `/frontend/src/entities/topic`, `/file`, `/folder`
-- [ ] Модели, API, компоненты, хуки
+- [ ] `entities/folder`: модели (FolderTree), хуки на чтение (из WS
+      `folder_tree_update`), отображение дерева
+- [ ] `entities/topic`: модели (Topic), хуки на чтение и переименование,
+      валидации имён
+- [ ] `entities/channel`: список каналов и их статус (`channel_status_update`)
+- [ ] (Опц.) `entities/session`: состояние авторизации (isAuthorized,
+      maskedPhone), derived state
+
+Acceptance:
+
+- Entities предоставляют типы, селекторы и базовые UI-компоненты без
+  бизнес-логики.
 
 ## 3.6. Features слой (FSD)
 
-- [ ] `/frontend/src/features/sync-files`, `/manage-topics`, `/download-files`,
-      `/file-system`
-- [ ] Компоненты, прогресс, настройки, хуки
+- [ ] `features/link-folder-to-topic`: выбор папки и топика, отправка команды
+      link, валидация конфликтов
+- [ ] `features/upload-folder`: отправка команды upload, прогресс/ошибки по
+      `upload_*`, управление pause/stop
+- [ ] `features/download-topic`: выбор targetPath, optional pattern/files,
+      слежение за `download_*`
+- [ ] `features/rename-topic`: смена имени и синхронизация с Telegram/БД
+- [ ] `features/auth-phone-code`: ввод номера телефона, обработка
+      `auth_pending_code`, ввод кода, обработка успеха/ошибок; (опц.) пароль 2FA
+
+Acceptance:
+
+- Каждая фича инкапсулирует команду WS и обрабатывает соответствующие события,
+  отдавая простой компонент + контроллер-хуки.
 
 ## 3.7. Widgets слой (FSD)
 
-- [ ] `/frontend/src/widgets/topics-dashboard`, `/file-explorer`, `/sync-status`
+- [ ] `widgets/ws-status`: индикатор соединения и счетчики (messagesIn/out,
+      drops)
+- [ ] `widgets/event-feed`: лента последних событий (`file_sync_*`, `upload_*`,
+      `channel_status_update`)
+- [ ] `widgets/folder-tree`: обзор локальной ФС
+- [ ] `widgets/topics-dashboard`: список топиков и краткие статусы
 
-## 3.8. Pages слой (FSD)
+Acceptance:
 
-- [ ] `/frontend/src/app` страницы: dashboard, topics, sync, files, settings
-- [ ] Использовать React, shadcn/ui для UI, TailwindCSS
+- Виджеты собирают entities+features, не содержат доменной логики, легко
+  переиспользуются.
 
-## 3.9. Статические ресурсы и стили
+## 3.8. Pages (App Router)
 
-- [ ] Настроить глобальные стили TailwindCSS
-- [ ] Оптимизировать изображений, favicon, шрифты
+- [ ] `/` Dashboard: ws-status, event-feed, быстрые действия
+- [ ] `/local-to-tg` (Local => TG): folder-tree + link + upload
+- [ ] `/tg-to-local` (TG => Local): topics + download
+- [ ] `/settings`: каналы, базовая директория
+- [ ] `/auth`: auth-phone-code flow
+
+Acceptance:
+
+- Навигация работает; основные сценарии MVP покрыты через WS.
+
+## 3.9. UI/стили и доступность
+
+- [x] Tailwind глобальные стили и токены
+- [ ] Установка shadcn/ui и настройка темы
+- [ ] A11y: доступные компоненты, фокус-стили, контрасты
+- [ ] Иконки, favicon, базовые шрифты (Inter)
+
+Acceptance:
+
+- UI соответствует базовым стандартам доступности; темing корректен.
+
+<!-- Раздел тестирования снят: тесты будут добавлены позже -->
+
+## 3.11. Инструменты разработчика
+
+- [ ] Dev панель WS: ручная отправка тестовых команд (dev-only)
+- [ ] Локальные логи/метрики в UI (Pino консоль, counters)
+
+Acceptance:
+
+- Ускоряет отладку WS и визуализацию состояния.
+
+<!-- HTTP-эндпоинтов не планируется: раздел про OpenAPI SDK/CI для SDK убран. CI остаётся общим на уровне репозитория. -->

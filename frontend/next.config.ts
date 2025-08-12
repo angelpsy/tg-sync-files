@@ -8,7 +8,7 @@ config({ path: resolve(__dirname, '../.env') });
 
 const nextConfig: NextConfig = {
   eslint: {
-    dirs: ['app', 'lib', 'components'],
+    dirs: ['app'],
   },
   typescript: {
     ignoreBuildErrors: false,

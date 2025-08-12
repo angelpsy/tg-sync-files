@@ -37,5 +37,26 @@
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
-  border-color: var(--color-border);
+}
+
+/* Map semantic utility classes to CSS variables */
+@layer utilities {
+  .bg-background {
+    background-color: var(--color-background);
+  }
+  .text-foreground {
+    color: var(--color-foreground);
+  }
+  .bg-card {
+    background-color: var(--color-card);
+  }
+  .text-card-foreground {
+    color: var(--color-card-foreground);
+  }
+  .text-muted-foreground {
+    color: var(--color-muted-foreground);
+  }
+  .border-border {
+    border-color: var(--color-border);
+  }
 }

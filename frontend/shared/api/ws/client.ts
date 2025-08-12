@@ -1,3 +1,4 @@
+import type { EventPayloadMap, TEventName } from '@/types/websocket/events';
 import type { Socket } from 'socket.io-client';
 import { io } from 'socket.io-client';
 
@@ -16,6 +17,21 @@ class WSClient {
   private onMessageHandlers = new Set<MessageHandler>();
   private onConnectHandlers = new Set<() => void>();
   private onDisconnectHandlers = new Set<(reason?: string) => void>();
+
+  /** Emit a typed event to the server */
+  emit<E extends TEventName>(event: E, payload: EventPayloadMap[E]): void {
+    this.socket?.emit(event as string, payload as unknown);
+  }
+
+  /** Subscribe to a typed event from the server; returns unsubscribe */
+  onEvent<E extends TEventName>(
+    event: E,
+    handler: (payload: EventPayloadMap[E]) => void
+  ): () => void {
+    const wrapped = (payload: unknown) => handler(payload as EventPayloadMap[E]);
+    this.socket?.on(event as string, wrapped as (...args: any[]) => void);
+    return () => this.socket?.off(event as string, wrapped as (...args: any[]) => void);
+  }
 
   connect(opts: WSClientOptions) {
     if (this.socket) return;

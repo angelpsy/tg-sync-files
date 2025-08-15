@@ -88,9 +88,13 @@ export class UploadOrchestrator implements IUploadOrchestrator {
     folderPath: string,
     channelId: string,
     topicId: string,
-    opts?: { conflictPolicy?: TUploadConflictPolicy; hashStrategy?: TFileHashStrategy }
+    opts?: {
+      conflictPolicy?: TUploadConflictPolicy;
+      hashStrategy?: TFileHashStrategy;
+      selectedFiles?: string[];
+    }
   ): Promise<IUploadSession> {
-    const files = await this.collectFiles(folderPath);
+    const files = await this.collectFiles(folderPath, opts?.selectedFiles);
     const sessionId = randomUUID();
     type ExtendedSession = InternalSession;
     const session: ExtendedSession = {
@@ -682,6 +686,23 @@ export class UploadOrchestrator implements IUploadOrchestrator {
           conflictsRenamed: s.conflictsRenamed,
           conflictsLogged: s.conflictsLogged,
         });
+        // Try to refresh topic files list for the UI
+        try {
+          const records = await this.storageService.getTopicFileRecords(s.topicId);
+          const originalFolders = Array.from(new Set(records.map(r => r.folderPath)));
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore – cast through shared EventPayloadMap at callsite elsewhere
+          this.socketService?.emit('topic_files_snapshot', {
+            topicId: s.topicId,
+            records,
+            originalFolders,
+          });
+        } catch (e) {
+          this.logger.debug('topic_files_snapshot emit after completion failed', {
+            topicId: s.topicId,
+            error: e,
+          });
+        }
         this.socketService?.emit('upload_progress', {
           uploadId: s.id,
           fileName: s.currentFile || '',
@@ -727,11 +748,14 @@ export class UploadOrchestrator implements IUploadOrchestrator {
     };
   }
 
-  private async collectFiles(folderPath: string): Promise<IFileInfo[]> {
+  private async collectFiles(folderPath: string, subset?: string[]): Promise<IFileInfo[]> {
     const entries = await readdir(folderPath, { withFileTypes: true });
     const result: IFileInfo[] = [];
     for (const entry of entries) {
       if (!entry.isFile()) continue;
+      // Skip hidden dotfiles and macOS Finder metadata
+      if (entry.name.startsWith('.') || entry.name === '.DS_Store') continue;
+      if (subset && subset.length > 0 && !subset.includes(entry.name)) continue;
       const full = join(folderPath, entry.name);
       try {
         const stats = await stat(full);
@@ -749,6 +773,8 @@ export class UploadOrchestrator implements IUploadOrchestrator {
         this.logger.warn('Could not stat file', { file: full, error: err });
       }
     }
+    // Alphabetical order by file name (locale-aware basic)
+    result.sort((a, b) => a.name.localeCompare(b.name));
     return result;
   }
 
@@ -937,6 +963,33 @@ export class UploadOrchestrator implements IUploadOrchestrator {
       }
     }
     this.logger.info('Recover dangling sessions: done', { count: candidates.length });
+  }
+
+  /** Returns shallow copy of public sessions for snapshotting */
+  async listSessions(): Promise<IUploadSession[]> {
+    const arr: IUploadSession[] = [];
+    for (const s of this.sessions.values()) {
+      arr.push({
+        id: s.id,
+        folderPath: s.folderPath,
+        topicId: s.topicId,
+        status: s.status,
+        totalFiles: s.totalFiles,
+        uploadedFiles: s.uploadedFiles,
+        currentFile: s.currentFile,
+        progress: s.progress,
+        startedAt: s.startedAt,
+        updatedAt: s.updatedAt,
+        completedAt: s.completedAt,
+        error: s.error,
+        realUploadedFiles: s.realUploaded,
+        skippedFilesCount: s.skipped,
+        conflictsSkipped: s.conflictsSkipped,
+        conflictsRenamed: s.conflictsRenamed,
+        conflictsLogged: s.conflictsLogged,
+      });
+    }
+    return arr;
   }
 }
 

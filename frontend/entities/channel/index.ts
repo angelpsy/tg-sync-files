@@ -1,2 +1,2 @@
-export * from './useChannelStatuses';
 export * from './useChannels';
+export * from './useChannelStatuses';

@@ -95,7 +95,11 @@ export interface IUploadOrchestrator {
     folderPath: string,
     channelId: string,
     topicId: string,
-    opts?: { conflictPolicy?: TUploadConflictPolicy; hashStrategy?: TFileHashStrategy }
+    opts?: {
+      conflictPolicy?: TUploadConflictPolicy;
+      hashStrategy?: TFileHashStrategy;
+      selectedFiles?: string[]; // if provided, restrict to this subset
+    }
   ): Promise<IUploadSession>;
 
   /**
@@ -137,4 +141,9 @@ export interface IUploadOrchestrator {
    * Graceful shutdown: flush persistence and cleanup resources
    */
   shutdown(): Promise<void>;
+
+  /**
+   * Lists in-memory (and optionally persisted) upload sessions for reconnect snapshots
+   */
+  listSessions(): Promise<IUploadSession[]>;
 }

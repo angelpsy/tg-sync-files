@@ -18,8 +18,10 @@ import type {
   ISocketService,
   IStorageService,
   ITelegramService,
+  ITelegramUserMinimal,
   IUploadOrchestrator,
 } from '@/types';
+import type { TFileHashStrategy, TUploadConflictPolicy } from '@/types/file-sync';
 import type { TEventName } from '@/types/websocket/events';
 
 function hasDestroy(svc: unknown): svc is { destroy: () => Promise<void> } {
@@ -131,7 +133,7 @@ export async function createBackendServices(): Promise<BackendServices> {
   }
 
   // Send current tree to newly connected clients
-  socketService.onClientConnect(clientId => {
+  socketService.onClientConnect(async clientId => {
     if (!lastTrees) return;
     try {
       // Emit to all for simplicity; optimization to target client would require sendToClient-event mapping
@@ -139,6 +141,13 @@ export async function createBackendServices(): Promise<BackendServices> {
         'folder_tree_update',
         lastTrees as unknown as EventPayloadMap['folder_tree_update']
       );
+      // Also emit current upload sessions snapshot for reconnecting UI
+      try {
+        const sessions = await uploadOrchestrator.listSessions();
+        socketService.emit('upload_sessions_snapshot', { sessions });
+      } catch (e) {
+        logger.warn('emit upload_sessions_snapshot on connect failed', { clientId, error: e });
+      }
     } catch (e) {
       logger.error('Emit on connect failed', { clientId, error: e });
     }
@@ -148,16 +157,151 @@ export async function createBackendServices(): Promise<BackendServices> {
   // Emit channels snapshot on client connect if Telegram is available
   // Telegram channels/topics/files WS API
   if (telegramService) {
+    type WithMe = ITelegramService & { getMeMinimal?: () => Promise<ITelegramUserMinimal | null> };
     socketService.onClientConnect(async clientId => {
       try {
         const channels = await telegramService.getChannels();
         socketService.emit('channels_snapshot', channels);
+        // Also broadcast current auth state
+        const isOk = await telegramService.checkSession();
+        const getMe = (telegramService as WithMe).getMeMinimal?.bind(
+          telegramService as ITelegramService
+        );
+        const maybeUser = getMe ? await getMe() : null;
+        socketService.emit('auth_state', { isAuthenticated: isOk, user: maybeUser ?? undefined });
       } catch (e) {
         logger.error('channels_snapshot emit failed', { clientId, error: e });
       }
     });
 
     if (hasInbound(socketService)) {
+      // Auth flow: auth_init -> code -> password (optional)
+      socketService.onInbound('auth_init', async (cid, payload: { phone: string }) => {
+        try {
+          const svc = telegramService as ITelegramService & {
+            startAuth?: (p: string) => Promise<{ needsCode: true; maskedPhone?: string }>;
+          };
+          if (!svc.startAuth) throw new Error('startAuth not supported');
+          const res = await svc.startAuth(payload.phone);
+          socketService.emit('auth_pending_code', { maskedPhone: res.maskedPhone });
+          // Emit state update (still unauthenticated)
+          const isOk = await telegramService.checkSession();
+          const getMe = (telegramService as WithMe).getMeMinimal?.bind(
+            telegramService as ITelegramService
+          );
+          const maybeUser = getMe ? await getMe() : null;
+          socketService.emit('auth_state', { isAuthenticated: isOk, user: maybeUser ?? undefined });
+        } catch (e) {
+          logger.error('auth_init failed', { cid, error: e });
+          socketService.emit('auth_error', {
+            code: 'AUTH_INIT_FAILED',
+            message: (e as Error).message,
+          });
+        }
+      });
+      socketService.onInbound('auth_code', async (cid, payload: { code: string }) => {
+        try {
+          const svc = telegramService as ITelegramService & {
+            submitCode?: (
+              code: string
+            ) => Promise<
+              | { success: true; maskedPhone?: string }
+              | { needsPassword: true; maskedPhone?: string }
+            >;
+          };
+          if (!svc.submitCode) throw new Error('submitCode not supported');
+          const res = await svc.submitCode(payload.code);
+          if ('needsPassword' in res) {
+            socketService.emit('auth_pending_password', { maskedPhone: res.maskedPhone });
+          } else {
+            socketService.emit('auth_success', { maskedPhone: res.maskedPhone || '' });
+            // Immediately refresh channels for client after successful auth
+            try {
+              const channels = await telegramService.getChannels();
+              socketService.emit('channels_snapshot', channels);
+            } catch (err) {
+              logger.warn('emit channels after auth failed', { error: err });
+            }
+          }
+          // Emit state update
+          const isOk = await telegramService.checkSession();
+          const getMe = (telegramService as WithMe).getMeMinimal?.bind(
+            telegramService as ITelegramService
+          );
+          const maybeUser = getMe ? await getMe() : null;
+          socketService.emit('auth_state', { isAuthenticated: isOk, user: maybeUser ?? undefined });
+        } catch (e) {
+          logger.error('auth_code failed', { cid, error: e });
+          socketService.emit('auth_error', {
+            code: 'AUTH_CODE_FAILED',
+            message: (e as Error).message,
+          });
+        }
+      });
+      socketService.onInbound('auth_password', async (cid, payload: { password: string }) => {
+        try {
+          const svc = telegramService as ITelegramService & {
+            submitPassword?: (password: string) => Promise<{ success: true; maskedPhone?: string }>;
+          };
+          if (!svc.submitPassword) throw new Error('submitPassword not supported');
+          const res = await svc.submitPassword(payload.password);
+          socketService.emit('auth_success', { maskedPhone: res.maskedPhone || '' });
+          // Immediately refresh channels for client after successful auth
+          try {
+            const channels = await telegramService.getChannels();
+            socketService.emit('channels_snapshot', channels);
+          } catch (err) {
+            logger.warn('emit channels after auth (password) failed', { error: err });
+          }
+          // Emit state update (now authenticated)
+          const isOk = await telegramService.checkSession();
+          const getMe = (telegramService as WithMe).getMeMinimal?.bind(
+            telegramService as ITelegramService
+          );
+          const maybeUser = getMe ? await getMe() : null;
+          socketService.emit('auth_state', { isAuthenticated: isOk, user: maybeUser ?? undefined });
+        } catch (e) {
+          logger.error('auth_password failed', { cid, error: e });
+          socketService.emit('auth_error', {
+            code: 'AUTH_PASSWORD_FAILED',
+            message: (e as Error).message,
+          });
+        }
+      });
+      // request_auth_state
+      socketService.onInbound('request_auth_state', async cid => {
+        try {
+          const isOk = await telegramService.checkSession();
+          const getMe = (telegramService as WithMe).getMeMinimal?.bind(
+            telegramService as ITelegramService
+          );
+          const maybeUser = getMe ? await getMe() : null;
+          socketService.emit('auth_state', { isAuthenticated: isOk, user: maybeUser ?? undefined });
+        } catch (e) {
+          logger.error('request_auth_state failed', { cid, error: e });
+        }
+      });
+
+      // auth_logout
+      socketService.onInbound('auth_logout', async cid => {
+        try {
+          // Clear sessions in DB and disconnect telegram client
+          await storage.clearTelegramSessions();
+          if (hasDestroy(telegramService)) await telegramService.destroy();
+          // Emit unauthenticated state and empty channels
+          socketService.emit('auth_state', { isAuthenticated: false });
+          socketService.emit(
+            'channels_snapshot',
+            [] as unknown as EventPayloadMap['channels_snapshot']
+          );
+        } catch (e) {
+          logger.error('auth_logout failed', { cid, error: e });
+          socketService.emit('auth_error', {
+            code: 'AUTH_LOGOUT_FAILED',
+            message: (e as Error).message,
+          });
+        }
+      });
       // request_channels
       socketService.onInbound('request_channels', async cid => {
         try {
@@ -182,6 +326,8 @@ export async function createBackendServices(): Promise<BackendServices> {
           // Try to find channel id for this topic via probing topics across channels
           const chans = await telegramService.getChannels();
           let foundChannelId: string | undefined;
+          let remoteFiles: Array<{ id: string; name?: string; size?: number; mimeType?: string }> =
+            [];
           for (const ch of chans) {
             try {
               const ts = await telegramService.getTopics(ch.id);
@@ -193,18 +339,134 @@ export async function createBackendServices(): Promise<BackendServices> {
               // ignore per-channel errors
             }
           }
-          if (!foundChannelId) throw new Error('Channel for topic not found');
-          await telegramService.listTopicFiles(foundChannelId, payload.topicId);
-          // Persisted records and original folders
+          // If channel is unknown, just emit what we have in DB (do not hard fail)
+          if (foundChannelId) {
+            try {
+              remoteFiles = await telegramService.listTopicFiles(foundChannelId, payload.topicId);
+            } catch (err) {
+              logger.warn('listTopicFiles failed; continuing with DB records only', {
+                topicId: payload.topicId,
+                error: (err as Error).message,
+              });
+            }
+          } else {
+            logger.warn('Channel for topic not found; emitting DB records only', {
+              topicId: payload.topicId,
+            });
+          }
+          // Persisted records and original folders (from DB)
           const records = await storage.getTopicFileRecords(payload.topicId);
-          const originalFolders = Array.from(new Set(records.map(r => r.folderPath)));
+          // If DB has no records yet, synthesize view-only records from Telegram listing so UI isn't empty
+          const finalRecords =
+            records && records.length > 0
+              ? records
+              : remoteFiles.map((f, idx) => ({
+                  id: `remote:${payload.topicId}:${f.id || idx}`,
+                  folderPath: '(remote)',
+                  topicId: payload.topicId,
+                  fileName: f.name || `file_${String(f.id || idx)}`,
+                  size: f.size || 0,
+                  mtimeMs: Date.now(),
+                  uploadedAt: new Date(),
+                  updatedAt: new Date(),
+                  hash: undefined,
+                }));
+          const originalFolders = Array.from(new Set(finalRecords.map(r => r.folderPath)));
           socketService.emit('topic_files_snapshot', {
             topicId: payload.topicId,
-            records,
+            records: finalRecords,
             originalFolders,
           } as unknown as EventPayloadMap['topic_files_snapshot']);
         } catch (e) {
           logger.error('request_topic_files failed', { cid, payload, error: e });
+        }
+      });
+
+      // Start single folder upload (new or existing topic)
+      socketService.onInbound('start_folder_upload', async (cid, payload) => {
+        try {
+          const {
+            folderPath,
+            channelId,
+            existingTopicId,
+            newTopicName,
+            selectedFiles,
+            conflictPolicy,
+            hashStrategy,
+          } = payload as EventPayloadMap['start_folder_upload'];
+          let topicId = existingTopicId;
+          const tg = telegramService as ITelegramService;
+          if (!topicId) {
+            if (!newTopicName)
+              throw new Error('Either existingTopicId or newTopicName is required');
+            const topic = await tg.createTopic(channelId, newTopicName);
+            topicId = topic.id;
+          }
+          if (!topicId) throw new Error('Topic id resolution failed');
+          await uploadOrchestrator.startUpload(folderPath, channelId, topicId, {
+            conflictPolicy: conflictPolicy as TUploadConflictPolicy,
+            hashStrategy: hashStrategy as TFileHashStrategy,
+            selectedFiles,
+          });
+          // Optionally emit refreshed sessions snapshot
+          try {
+            const sessions = await uploadOrchestrator.listSessions();
+            socketService.emit('upload_sessions_snapshot', { sessions });
+          } catch (e) {
+            logger.debug('upload sessions snapshot emit failed', { error: e });
+          }
+        } catch (e) {
+          logger.error('start_folder_upload failed', { cid, payload, error: e });
+        }
+      });
+
+      // Start bulk folder uploads
+      socketService.onInbound('start_bulk_folder_upload', async (cid, payload) => {
+        const arr = payload as EventPayloadMap['start_bulk_folder_upload'];
+        for (const item of arr) {
+          try {
+            const {
+              folderPath,
+              channelId,
+              existingTopicId,
+              newTopicName,
+              selectedFiles,
+              conflictPolicy,
+              hashStrategy,
+            } = item;
+            let topicId = existingTopicId;
+            const tg = telegramService as ITelegramService;
+            if (!topicId) {
+              if (!newTopicName)
+                throw new Error('Either existingTopicId or newTopicName is required');
+              const topic = await tg.createTopic(channelId, newTopicName);
+              topicId = topic.id;
+            }
+            if (!topicId) throw new Error('Topic id resolution failed');
+            await uploadOrchestrator.startUpload(folderPath, channelId, topicId, {
+              conflictPolicy: (conflictPolicy as TUploadConflictPolicy) || undefined,
+              hashStrategy: (hashStrategy as TFileHashStrategy) || undefined,
+              selectedFiles,
+            });
+          } catch (e) {
+            logger.error('bulk item start failed', { item, error: e });
+          }
+        }
+        try {
+          const sessions = await uploadOrchestrator.listSessions();
+          socketService.emit('upload_sessions_snapshot', { sessions });
+        } catch (e) {
+          logger.debug('upload sessions snapshot emit failed (bulk)', { error: e });
+        }
+      });
+
+      // request_upload_sessions
+      socketService.onInbound('request_upload_sessions', async cid => {
+        try {
+          const sessions = await uploadOrchestrator.listSessions();
+          socketService.emit('upload_sessions_snapshot', { sessions });
+        } catch (e) {
+          logger.error('request_upload_sessions failed', { cid, error: e });
         }
       });
     }

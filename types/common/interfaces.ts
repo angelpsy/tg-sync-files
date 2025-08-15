@@ -51,6 +51,11 @@ export interface IStorageService {
   saveTelegramSession(session: ITelegramSession): Promise<void>;
 
   /**
+   * Clears all Telegram sessions (logout)
+   */
+  clearTelegramSessions(): Promise<void>;
+
+  /**
    * Gets file record by topic and name
    */
   getFileRecord(topicId: string, fileName: string): Promise<IFileRecord | null>;

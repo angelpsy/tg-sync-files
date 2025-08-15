@@ -47,6 +47,16 @@ export interface ITelegramSession {
   updatedAt: Date;
 }
 
+/** Minimal user info for UI */
+export interface ITelegramUserMinimal {
+  id: string;
+  username?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+  displayName: string;
+}
+
 /** Channel connection / sync status */
 export interface IChannelStatus {
   channelId: string;

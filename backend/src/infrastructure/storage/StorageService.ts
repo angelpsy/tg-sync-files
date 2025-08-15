@@ -400,6 +400,17 @@ export class StorageService implements IStorageService {
     }
   }
 
+  /** Clears all Telegram sessions (logout) */
+  async clearTelegramSessions(): Promise<void> {
+    this.logger.debug('Clearing all Telegram sessions');
+    try {
+      await this.prisma.telegramSession.deleteMany({});
+    } catch (error) {
+      this.logger.error('Error clearing telegram sessions', { error });
+      throw error;
+    }
+  }
+
   /**
    * Maps channel from DB to domain model
    */

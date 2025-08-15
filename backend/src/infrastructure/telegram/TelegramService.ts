@@ -13,6 +13,7 @@ import type {
   ITelegramChannel,
   ITelegramService,
   ITelegramSession,
+  ITelegramUserMinimal,
   ITopic,
 } from '../../../../types';
 import type { RetryConfig } from '../../config/retryConfig';
@@ -28,6 +29,9 @@ export class TelegramService implements ITelegramService {
   private logger = createLogger.child({ module: 'TelegramService' });
   private retryManager: RetryManager;
   private channelCache: ITelegramChannel[] | null = null;
+  // Stepwise auth state
+  private authPhone?: string;
+  private phoneCodeHash?: string;
 
   constructor(
     private storageService: IStorageService,
@@ -99,9 +103,132 @@ export class TelegramService implements ITelegramService {
     return true;
   }
 
+  /** Starts stepwise authentication by sending code */
+  async startAuth(phoneNumber: string): Promise<{ needsCode: true; maskedPhone?: string }> {
+    if (!this.client || !this.isInitialized) {
+      await this.initialize();
+    }
+    const client = this.getClient();
+    await client.connect();
+    try {
+      this.logger.info('Sending auth code...', { phoneNumber });
+      const res = await client.invoke(
+        new Api.auth.SendCode({
+          phoneNumber,
+          apiId: this.apiId,
+          apiHash: this.apiHash,
+          settings: new Api.CodeSettings({}),
+        })
+      );
+      // res.phoneCodeHash contains hash for next step
+      // Store state
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyRes: any = res as any;
+      this.authPhone = phoneNumber;
+      this.phoneCodeHash = anyRes.phoneCodeHash as string | undefined;
+      return {
+        needsCode: true,
+        maskedPhone: phoneNumber.replace(/(\+?\d{0,2})\d{3}(\d{2,})/, '$1***$2'),
+      };
+    } catch (error) {
+      this.logger.error(error as Error, 'startAuth failed');
+      throw error;
+    }
+  }
+
+  /** Submits received code; may require 2FA password */
+  async submitCode(
+    code: string
+  ): Promise<
+    { success: true; maskedPhone?: string } | { needsPassword: true; maskedPhone?: string }
+  > {
+    if (!this.client || !this.isInitialized) {
+      await this.initialize();
+    }
+    const client = this.getClient();
+    await client.connect();
+    if (!this.authPhone || !this.phoneCodeHash) throw new Error('Auth not initiated');
+    try {
+      this.logger.info('Submitting auth code...');
+      const res = await client.invoke(
+        new Api.auth.SignIn({
+          phoneNumber: this.authPhone,
+          phoneCodeHash: this.phoneCodeHash,
+          phoneCode: code,
+        })
+      );
+      if (res instanceof Api.auth.Authorization) {
+        const saved = client.session.save();
+        const sessionData = typeof saved === 'string' ? saved : '';
+        const session: ITelegramSession = {
+          id: '1',
+          sessionData,
+          stringSession: sessionData,
+          phoneNumber: this.authPhone,
+          isActive: true,
+          lastUsed: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        await this.storageService.saveTelegramSession(session);
+        // Clear auth state
+        this.authPhone = undefined;
+        this.phoneCodeHash = undefined;
+        return { success: true, maskedPhone: session.phoneNumber };
+      }
+      // If we receive auth.AuthorizationSignUpRequired or similar, treat as success for now
+      return { success: true, maskedPhone: this.authPhone };
+    } catch (error) {
+      // If error indicates SESSION_PASSWORD_NEEDED
+      const msg = (error as Error).message || '';
+      if (msg.includes('SESSION_PASSWORD_NEEDED') || msg.includes('PASSWORD_HASH_INVALID')) {
+        return { needsPassword: true, maskedPhone: this.authPhone };
+      }
+      this.logger.error(error as Error, 'submitCode failed');
+      throw error;
+    }
+  }
+
+  /** Submits 2FA password */
+  async submitPassword(password: string): Promise<{ success: true; maskedPhone?: string }> {
+    if (!this.client || !this.isInitialized) {
+      await this.initialize();
+    }
+    const client = this.getClient();
+    await client.connect();
+    try {
+      this.logger.info('Submitting 2FA password...');
+      // GramJS high-level method
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyClient: any = client as any;
+      await anyClient.checkPassword(password);
+      const saved = client.session.save();
+      const sessionData = typeof saved === 'string' ? saved : '';
+      const session: ITelegramSession = {
+        id: '1',
+        sessionData,
+        stringSession: sessionData,
+        phoneNumber: this.authPhone,
+        isActive: true,
+        lastUsed: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await this.storageService.saveTelegramSession(session);
+      this.authPhone = undefined;
+      this.phoneCodeHash = undefined;
+      return { success: true, maskedPhone: session.phoneNumber };
+    } catch (error) {
+      this.logger.error(error as Error, 'submitPassword failed');
+      throw error;
+    }
+  }
+
   /** Fetch channels that support forums */
   async getChannels(): Promise<ITelegramChannel[]> {
-    this.ensureInitialized();
+    if (!this.client || !this.isInitialized) {
+      await this.initialize();
+    }
     if (this.channelCache) return this.channelCache; // serve from cache to reduce flood
     const client = this.getClient();
     return this.executeWithRetry('getChannels', async () => {
@@ -171,14 +298,18 @@ export class TelegramService implements ITelegramService {
       if ('topics' in result) {
         for (const t of result.topics) {
           if (t instanceof Api.ForumTopic) {
+            const idStr = t.id.toString();
+            const title = t.title || '';
+            const isGeneral = idStr === '1' || /^(general|общее)$/i.test(title.trim());
+            if (isGeneral) continue; // hide General topic
             topics.push({
-              id: t.id.toString(),
+              id: idStr,
               channelId,
-              title: t.title,
-              name: t.title,
+              title,
+              name: title,
               iconColor: undefined,
               iconEmojiId: undefined,
-              isGeneral: false,
+              isGeneral,
               isClosed: false,
               isHidden: false,
               totalMessages: 0,
@@ -241,12 +372,19 @@ export class TelegramService implements ITelegramService {
           channelId: this.toBigInt(channelId),
           accessHash: this.toBigInt(channel.accessHash ? channel.accessHash : '0'),
         });
-        // sendFile signature: client.sendFile(entity, { file, caption, replyTo })
+        // sendFile signature: client.sendFile(entity, { file, caption, replyTo, forceDocument, mimeType, attributes })
         const sendFn = (
           client as unknown as {
             sendFile: (
               entity: unknown,
-              options: { file: string; caption?: string; replyTo?: number }
+              options: {
+                file: string;
+                caption?: string;
+                replyTo?: number;
+                forceDocument?: boolean;
+                mimeType?: string;
+                attributes?: unknown[];
+              }
             ) => Promise<unknown>;
           }
         ).sendFile;
@@ -254,6 +392,10 @@ export class TelegramService implements ITelegramService {
           file: file.path,
           caption: file.name,
           replyTo: parseInt(topicId, 10),
+          // Always send as document to avoid Telegram compressing media
+          forceDocument: true,
+          // Provide a safe fallback mimeType; Telegram/GramJS may detect by filename
+          mimeType: file.mimeType || 'application/octet-stream',
         });
         this.logger.info(`File ${file.name} uploaded successfully`);
       } catch (err) {
@@ -378,6 +520,33 @@ export class TelegramService implements ITelegramService {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  /** Returns minimal current user info if authenticated */
+  async getMeMinimal(): Promise<ITelegramUserMinimal | null> {
+    if (!this.client) return null;
+    try {
+      const me = await this.getClient().getMe();
+      // me can be an object with properties username, phone, firstName, lastName, id
+      // We keep it defensive to avoid direct GramJS type coupling
+      const id = (me as unknown as { id?: bigint | number | string })?.id;
+      const firstName = (me as unknown as { firstName?: string })?.firstName;
+      const lastName = (me as unknown as { lastName?: string })?.lastName;
+      const username = (me as unknown as { username?: string })?.username;
+      const phone = (me as unknown as { phone?: string })?.phone;
+      const displayName =
+        [firstName, lastName].filter(Boolean).join(' ') || username || phone || String(id || '');
+      return {
+        id: id ? id.toString() : '',
+        username,
+        phone,
+        firstName,
+        lastName,
+        displayName,
+      };
+    } catch {
+      return null;
     }
   }
 

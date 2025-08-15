@@ -1,3 +1,4 @@
+import { AuthPanel } from '@/widgets/auth/AuthPanel';
 import { EventFeed } from '@/widgets/event-feed/EventFeed';
 import { FolderTree } from '@/widgets/folder-tree/FolderTree';
 import { TopicsDashboard } from '@/widgets/topics-dashboard/TopicsDashboard';
@@ -12,8 +13,14 @@ export default function HomePage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <TopicsDashboard />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2">
+          <TopicsDashboard />
+        </div>
+        <AuthPanel />
+      </div>
+
+      <div className="space-y-6">
         <FolderTree />
       </div>
 

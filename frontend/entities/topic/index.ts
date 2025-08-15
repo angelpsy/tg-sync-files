@@ -1,3 +1,3 @@
 export * from './useRenameTopic';
-export * from './useTopics';
 export * from './useTopicFiles';
+export * from './useTopics';

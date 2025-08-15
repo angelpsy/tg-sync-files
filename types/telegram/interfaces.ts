@@ -22,6 +22,26 @@ export interface ITelegramService {
   authenticate(phoneNumber?: string): Promise<{ needsPassword: boolean; needsCode: boolean }>;
 
   /**
+   * Starts stepwise authentication by sending a code to the phone.
+   * Returns when code is sent and next step is required.
+   */
+  startAuth?(phoneNumber: string): Promise<{ needsCode: true; maskedPhone?: string }>;
+
+  /**
+   * Submits the received code. If 2FA password is required, returns that requirement.
+   */
+  submitCode?(
+    code: string
+  ): Promise<
+    { success: true; maskedPhone?: string } | { needsPassword: true; maskedPhone?: string }
+  >;
+
+  /**
+   * Submits the 2FA password to complete login.
+   */
+  submitPassword?(password: string): Promise<{ success: true; maskedPhone?: string }>;
+
+  /**
    * Confirms authentication with SMS code
    */
   confirmAuth(code: string): Promise<boolean>;

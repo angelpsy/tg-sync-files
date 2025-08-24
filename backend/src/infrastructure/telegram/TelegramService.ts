@@ -1,6 +1,12 @@
 import bigInt, { type BigInteger } from 'big-integer';
 import * as input from 'input';
 import { TelegramClient } from 'telegram';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore internal password helper (no TS types published)
+// Import password SRP helper from public root path (avoids bundling internal client path)
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore library lacks types for Password export
+import { computeCheck } from 'telegram/Password';
 import { StringSession } from 'telegram/sessions';
 import { Api } from 'telegram/tl';
 
@@ -198,10 +204,10 @@ export class TelegramService implements ITelegramService {
     await client.connect();
     try {
       this.logger.info('Submitting 2FA password...');
-      // GramJS high-level method
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const anyClient: any = client as any;
-      await anyClient.checkPassword(password);
+      // Official SRP flow: GetPassword -> computeCheck -> auth.CheckPassword
+      const pwState = await client.invoke(new Api.account.GetPassword());
+      const passwordCheck = await computeCheck(pwState, password);
+      await client.invoke(new Api.auth.CheckPassword({ password: passwordCheck }));
       const saved = client.session.save();
       const sessionData = typeof saved === 'string' ? saved : '';
       const session: ITelegramSession = {

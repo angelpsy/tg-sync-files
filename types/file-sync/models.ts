@@ -2,7 +2,7 @@
  * File sync domain models
  */
 
-import type { TFileChangeType, TSyncStatus, TUploadStatus } from './enums';
+import type { TFileChangeType, TOperationStatus, TSyncStatus, TUploadStatus } from './enums';
 
 /**
  * File information model
@@ -318,4 +318,149 @@ export interface ISyncDiffResult {
   unchangedFiles: string[]; // satisfied
   remoteOnlyFiles?: string[]; // exist remotely but not locally nor in records (orphan remote)
   timestamp: number;
+}
+
+/**
+ * Download session model (parallel to IUploadSession)
+ */
+export interface IDownloadSession {
+  /** Session identifier */
+  id: string;
+  /** Target local folder path for download */
+  targetPath: string;
+  /** Source topic id in Telegram */
+  topicId: string;
+  /** Channel id containing the topic */
+  channelId: string;
+  /** Current session status */
+  status: TOperationStatus;
+  /** Selected files to download (empty array = all files) */
+  selectedFiles: string[];
+  /** Total files determined at session start */
+  totalFiles: number;
+  /** Count of files downloaded OR skipped as already exist */
+  downloadedFiles: number;
+  /** Name of file currently being processed */
+  currentFile?: string;
+  /** Percentage (integer 0..100) = Math.round(downloadedFiles / totalFiles * 100) */
+  progress: number;
+  /** Timestamp when session started */
+  startedAt: Date;
+  /** Last mutation timestamp (any state change) */
+  updatedAt: Date;
+  /** Completion timestamp when finished or failed */
+  completedAt?: Date;
+  /** Error message if session failed or was cancelled */
+  error?: string;
+  /** Count of actually downloaded files (excludes skips) */
+  realDownloadedFiles?: number;
+  /** Count of skipped files (already exist locally) */
+  skippedFilesCount?: number;
+}
+
+/**
+ * Download result model (parallel to IUploadResult)
+ */
+export interface IDownloadResult {
+  downloadId: string;
+  /** Final high-level session status */
+  status: TOperationStatus;
+  /** Total number of files in the topic */
+  totalFiles: number;
+  /** Number of files successfully downloaded OR skipped as already exist */
+  downloadedFiles: number;
+  /** Number of files actually downloaded (excludes skips) */
+  realDownloadedFiles?: number;
+  /** Number of files skipped as already exist locally */
+  skippedFilesCount?: number;
+  /** File names that failed to download */
+  failedFiles: string[];
+  /** Target folder path */
+  targetPath: string;
+  /** Session start time */
+  startedAt: Date;
+  /** Session completion time */
+  completedAt?: Date;
+}
+
+/**
+ * Download progress for WebSocket events (parallel to IUploadProgress)
+ */
+export interface IDownloadProgress {
+  downloadId: string;
+  fileName: string;
+  fileIndex: number;
+  totalFiles: number;
+  downloadedBytes: number;
+  totalBytes: number;
+  speed: number; // bytes per second
+  eta: number; // seconds
+}
+
+/**
+ * Download lifecycle start event payload
+ */
+export interface IDownloadStartEvent {
+  downloadId: string;
+  targetPath: string;
+  topicId: string;
+  channelId: string;
+  totalFiles: number;
+  selectedFiles: string[];
+  timestamp: number;
+}
+
+/**
+ * Download lifecycle completion event payload
+ */
+export interface IDownloadCompleteEvent {
+  downloadId: string;
+  topicId: string;
+  totalFiles: number;
+  downloadedFiles: number;
+  failedFiles: number;
+  hasFailures: boolean;
+  durationMs: number;
+  timestamp: number;
+  realDownloadedFiles?: number;
+  skippedFilesCount?: number;
+}
+
+/**
+ * Download lifecycle error event payload
+ */
+export interface IDownloadErrorEvent {
+  downloadId: string;
+  topicId: string;
+  error: string;
+  timestamp: number;
+}
+
+/**
+ * File-level download event (per file action)
+ * action: downloaded | skipped | failed
+ * reason: already_exists | error
+ */
+export interface IDownloadFileEvent {
+  downloadId: string;
+  topicId: string;
+  fileName: string;
+  action: 'downloaded' | 'skipped' | 'failed';
+  reason?: 'already_exists' | 'error';
+  index: number; // 1-based processed index after this action
+  totalFiles: number;
+  error?: string;
+  timestamp: number;
+}
+
+/**
+ * Topic file metadata (for UI file selection)
+ */
+export interface ITopicFileInfo {
+  id: string; // Telegram message/document ID
+  name: string;
+  size: number;
+  mimeType?: string;
+  uploadedAt?: Date;
+  messageId?: number;
 }

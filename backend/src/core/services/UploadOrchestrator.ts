@@ -13,6 +13,7 @@ import {
   type IFileInfo,
   type IFileRecord,
   type ISyncDiffResult,
+  type ITopicFileInfo,
   type IUploadOrchestrator,
   type IUploadProgress,
   type IUploadResult,
@@ -689,13 +690,19 @@ export class UploadOrchestrator implements IUploadOrchestrator {
         // Try to refresh topic files list for the UI
         try {
           const records = await this.storageService.getTopicFileRecords(s.topicId);
-          const originalFolders = Array.from(new Set(records.map(r => r.folderPath)));
+          const files: ITopicFileInfo[] = records.map(r => ({
+            id: r.id, // using composite id as file id
+            name: r.fileName,
+            size: r.size,
+            mimeType: '', // not stored in IFileRecord
+            uploadedAt: r.uploadedAt,
+            messageId: 0, // not stored in IFileRecord
+          }));
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore – cast through shared EventPayloadMap at callsite elsewhere
           this.socketService?.emit('topic_files_snapshot', {
             topicId: s.topicId,
-            records,
-            originalFolders,
+            files,
           });
         } catch (e) {
           this.logger.debug('topic_files_snapshot emit after completion failed', {

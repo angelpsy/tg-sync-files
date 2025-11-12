@@ -37,6 +37,7 @@ model Topic {
   channel           Channel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
   folderTopicLinks  FolderTopicLink[]
   uploadSessions    UploadSession[]
+  downloadSessions  DownloadSession[]
   fileRecords       FileRecord[]
 
   @@map("topics")
@@ -84,6 +85,33 @@ model UploadSession {
   topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
   @@map("upload_sessions")
+}
+
+// Download sessions tracking (parallel to upload sessions)
+model DownloadSession {
+  id                 String         @id @default(cuid())
+  topicId           String
+  channelId         String
+  targetPath        String
+  status            DownloadStatus @default(PENDING)
+  selectedFiles     Json           @default("[]") // Array of file names, empty = all files
+  totalFiles        Int
+  downloadedFiles   Int            @default(0)
+  currentFile       String?
+  progress          Float          @default(0)
+  startedAt         DateTime
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  completedAt       DateTime?
+  error             String?
+  // Extended metrics (optional)
+  realDownloadedFiles Int?         @default(0)
+  skippedFilesCount   Int?         @default(0)
+
+  // Relations
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@map("download_sessions")
 }
 
 // Telegram session data
@@ -142,12 +170,34 @@ enum SyncStatus {
   ERROR
 }
 
-// Enum for upload status
-enum UploadStatus {
+// Enum for operation status (unified for upload/download)
+enum OperationStatus {
   PENDING
-  UPLOADING
+  IN_PROGRESS
   PAUSED
   COMPLETED
   PARTIAL
   FAILED
+  SKIPPED
+}
+
+// Legacy enum for upload status (mapped to OperationStatus)
+enum UploadStatus {
+  PENDING
+  UPLOADING // maps to IN_PROGRESS
+  PAUSED
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
+// Download status uses the same OperationStatus
+enum DownloadStatus {
+  PENDING
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  PARTIAL
+  FAILED
+  SKIPPED
 }

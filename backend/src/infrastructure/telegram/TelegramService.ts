@@ -1,3 +1,6 @@
+import { mkdir } from 'fs/promises';
+import { dirname, join } from 'path';
+
 import bigInt, { type BigInteger } from 'big-integer';
 import * as input from 'input';
 import { TelegramClient } from 'telegram';
@@ -21,6 +24,7 @@ import type {
   ITelegramSession,
   ITelegramUserMinimal,
   ITopic,
+  ITopicFileInfo,
 } from '../../../../types';
 import type { RetryConfig } from '../../config/retryConfig';
 import { RETRY_CONFIGS, RetryManager } from '../../config/retryConfig';
@@ -429,6 +433,7 @@ export class TelegramService implements ITelegramService {
         targetPath,
         startedAt: new Date(),
         completedAt: new Date(),
+        status: 'completed',
       };
       return result;
     });
@@ -457,15 +462,15 @@ export class TelegramService implements ITelegramService {
   }
 
   /** List files (documents) present in a forum topic */
-  async listTopicFiles(
-    channelId: string,
-    topicId: string
-  ): Promise<Array<{ id: string; name?: string; size?: number; mimeType?: string }>> {
+  async listTopicFiles(channelId: string, topicId: string): Promise<ITopicFileInfo[]> {
     this.ensureInitialized();
     const client = this.getClient();
     return this.executeWithRetry('listTopicFiles', async () => {
+      this.logger.info(`Listing files for topic ${topicId} in channel ${channelId}...`);
+
       const channel = await this.getChannelById(channelId);
       if (!channel) throw new Error(`Channel ${channelId} not found`);
+
       // Use GetReplies to fetch messages inside the topic
       const result = await client.invoke(
         new Api.messages.GetReplies({
@@ -483,7 +488,8 @@ export class TelegramService implements ITelegramService {
           hash: this.toBigInt(0),
         })
       );
-      const files: Array<{ id: string; name?: string; size?: number; mimeType?: string }> = [];
+
+      const files: ITopicFileInfo[] = [];
       if ('messages' in result) {
         for (const m of result.messages) {
           if (
@@ -493,7 +499,12 @@ export class TelegramService implements ITelegramService {
             'document' in m.media
           ) {
             const doc = m.media.document as
-              | { id?: bigint | number; size?: number; mimeType?: string; attributes?: unknown[] }
+              | {
+                  id?: bigint | number;
+                  size?: BigInteger;
+                  mimeType?: string;
+                  attributes?: unknown[];
+                }
               | undefined;
             if (doc) {
               let name: string | undefined;
@@ -506,14 +517,18 @@ export class TelegramService implements ITelegramService {
               }
               files.push({
                 id: doc.id ? doc.id.toString() : m.id?.toString?.() || '',
-                name,
-                size: doc.size,
+                name: name || `file_${doc.id}.bin`,
+                size: doc.size ? parseInt(doc.size.toString()) : 0,
                 mimeType: doc.mimeType,
+                uploadedAt: m.date ? new Date(m.date * 1000) : undefined,
+                messageId: m.id,
               });
             }
           }
         }
       }
+
+      this.logger.info(`Found ${files.length} files in topic ${topicId}`);
       return files;
     });
   }
@@ -554,6 +569,103 @@ export class TelegramService implements ITelegramService {
     } catch {
       return null;
     }
+  }
+
+  /** Downloads single file from topic to specified path */
+  async downloadFile(
+    channelId: string,
+    topicId: string,
+    fileId: string,
+    targetPath: string,
+    fileName: string
+  ): Promise<void> {
+    this.ensureInitialized();
+    return this.executeWithRetry('downloadFile', async () => {
+      this.logger.info(`Downloading file ${fileName} (${fileId}) to ${targetPath}...`);
+
+      const channel = await this.getChannelById(channelId);
+      if (!channel) throw new Error(`Channel ${channelId} not found`);
+
+      const client = this.getClient();
+      const entity = new Api.InputChannel({
+        channelId: this.toBigInt(channelId),
+        accessHash: this.toBigInt(channel.accessHash || '0'),
+      });
+
+      // Find the message with the specific file
+      const response = await client.invoke(
+        new Api.messages.GetHistory({
+          peer: entity,
+          offsetId: 0,
+          offsetDate: 0,
+          addOffset: 0,
+          limit: 100,
+          maxId: 0,
+          minId: 0,
+          hash: bigInt(0),
+        })
+      );
+
+      let targetMessage: Api.Message | null = null;
+
+      if (
+        response instanceof Api.messages.MessagesSlice ||
+        response instanceof Api.messages.Messages
+      ) {
+        for (const message of response.messages) {
+          if (message instanceof Api.Message && message.media instanceof Api.MessageMediaDocument) {
+            const doc = message.media.document;
+            if (doc instanceof Api.Document && doc.id.toString() === fileId) {
+              // Check if message belongs to the specific topic
+              if (message.replyTo instanceof Api.MessageReplyHeader) {
+                const replyTopicId = message.replyTo.replyToMsgId?.toString();
+                if (replyTopicId !== topicId) continue;
+              }
+              targetMessage = message;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!targetMessage) {
+        throw new Error(`File ${fileId} not found in topic ${topicId}`);
+      }
+
+      // Use client.downloadMedia to download the file
+      const fullPath = join(targetPath, fileName);
+
+      // Create directory if it doesn't exist
+      const dir = dirname(fullPath);
+      await mkdir(dir, { recursive: true }).catch(() => {
+        // Directory might already exist, ignore error
+      });
+
+      // Download using GramJS downloadMedia
+      const downloadFn = (
+        client as unknown as {
+          downloadMedia: (
+            message: Api.Message,
+            options?: {
+              outputFile?: string;
+              progressCallback?: (received: number, total: number) => void;
+            }
+          ) => Promise<string | Buffer>;
+        }
+      ).downloadMedia;
+
+      await downloadFn.call(client, targetMessage, {
+        outputFile: fullPath,
+        progressCallback: (received: number, total: number) => {
+          const progress = Math.round((received / total) * 100);
+          this.logger.debug(
+            `Download progress for ${fileName}: ${progress}% (${received}/${total} bytes)`
+          );
+        },
+      });
+
+      this.logger.info(`Successfully downloaded ${fileName} to ${fullPath}`);
+    });
   }
 
   /**

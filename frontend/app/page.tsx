@@ -1,5 +1,6 @@
 import { AuthPanel } from '@/widgets/auth/AuthPanel';
 import { EventFeed } from '@/widgets/event-feed/EventFeed';
+import { DownloadProgressWidget } from '@/widgets/file-download';
 import { FolderTree } from '@/widgets/folder-tree/FolderTree';
 import { TopicsDashboard } from '@/widgets/topics-dashboard/TopicsDashboard';
 
@@ -17,7 +18,10 @@ export default function HomePage() {
         <div className="md:col-span-2">
           <TopicsDashboard />
         </div>
-        <AuthPanel />
+        <div className="space-y-4">
+          <AuthPanel />
+          <DownloadProgressWidget />
+        </div>
       </div>
 
       <div className="space-y-6">

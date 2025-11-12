@@ -285,6 +285,7 @@ export const serviceLoggers = {
   telegram: LoggerFactory.createServiceLogger('Telegram'),
   sync: LoggerFactory.createServiceLogger('Sync'), // kept for legacy references
   upload: LoggerFactory.createServiceLogger('Upload'),
+  downloadOrchestrator: LoggerFactory.createServiceLogger('DownloadOrchestrator'),
   storage: LoggerFactory.createServiceLogger('Storage'),
   socket: LoggerFactory.createServiceLogger('Socket'),
   scheduler: LoggerFactory.createServiceLogger('Scheduler'),

@@ -2,7 +2,12 @@
  * Telegram domain interfaces
  */
 
-import type { IDownloadOptions, IDownloadResult, IFileInfo } from '../file-sync/index.js';
+import type {
+  IDownloadOptions,
+  IDownloadResult,
+  IFileInfo,
+  ITopicFileInfo,
+} from '../file-sync/index.js';
 
 import type { IChannelStatus, ITelegramChannel, ITopic } from './models.js';
 
@@ -68,14 +73,23 @@ export interface ITelegramService {
 
   /**
    * Lists files (documents) inside a forum topic
+   * Returns detailed file information for UI selection
    */
-  listTopicFiles(
-    channelId: string,
-    topicId: string
-  ): Promise<Array<{ id: string; name?: string; size?: number; mimeType?: string }>>;
+  listTopicFiles(channelId: string, topicId: string): Promise<ITopicFileInfo[]>;
 
   /**
-   * Downloads files from topic
+   * Downloads single file from topic to specified path
+   */
+  downloadFile(
+    channelId: string,
+    topicId: string,
+    fileId: string,
+    targetPath: string,
+    fileName: string
+  ): Promise<void>;
+
+  /**
+   * Downloads files from topic (batch operation)
    */
   downloadFiles(
     channelId: string,
@@ -102,7 +116,6 @@ export interface ITelegramService {
   // Legacy methods for backward compatibility
   initSession?(): Promise<void>;
   uploadFileForTopic?(topicId: string, file: IFileInfo): Promise<void>;
-  downloadFile?(messageId: string, outputPath: string): Promise<void>;
   downloadTopicFiles?(
     topicId: string,
     targetPath: string,

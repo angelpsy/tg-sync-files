@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { serviceLoggers } from '../../shared/logger';
 
 import { loadConfig, type AppConfig } from './config/env';
+import { DownloadOrchestrator } from './core/services/DownloadOrchestrator';
 import { SchedulerService } from './core/services/SchedulerService';
 import { UploadOrchestrator } from './core/services/UploadOrchestrator';
 import { FSService } from './infrastructure/fs/FSService';
@@ -21,7 +22,11 @@ import type {
   ITelegramUserMinimal,
   IUploadOrchestrator,
 } from '@/types';
-import type { TFileHashStrategy, TUploadConflictPolicy } from '@/types/file-sync';
+import type {
+  IDownloadOrchestrator,
+  TFileHashStrategy,
+  TUploadConflictPolicy,
+} from '@/types/file-sync';
 import type { TEventName } from '@/types/websocket/events';
 
 function hasDestroy(svc: unknown): svc is { destroy: () => Promise<void> } {
@@ -63,6 +68,7 @@ export interface BackendServices {
   socketService: ISocketService;
   scheduler: ISchedulerService;
   uploadOrchestrator: UploadOrchestrator & IUploadOrchestrator;
+  downloadOrchestrator: DownloadOrchestrator & IDownloadOrchestrator;
   shutdown: () => Promise<void>;
   startedAt: Date;
 }
@@ -469,6 +475,56 @@ export async function createBackendServices(): Promise<BackendServices> {
           logger.error('request_upload_sessions failed', { cid, error: e });
         }
       });
+
+      // Download handlers
+      socketService.onInbound(
+        'start_topic_download',
+        async (
+          cid,
+          payload: {
+            topicId: string;
+            channelId: string;
+            targetPath: string;
+            selectedFiles?: string[];
+            overwriteExisting?: boolean;
+          }
+        ) => {
+          try {
+            logger.info('start_topic_download received', { cid, payload });
+            const result = await downloadOrchestrator.startDownload(
+              payload.topicId,
+              payload.channelId,
+              payload.targetPath,
+              {
+                selectedFiles: payload.selectedFiles,
+                overwriteExisting: payload.overwriteExisting,
+              }
+            );
+            logger.info('start_topic_download completed', { sessionId: result.id });
+          } catch (e) {
+            logger.error('start_topic_download failed', { cid, error: e, payload });
+            socketService.emit('download_error', {
+              downloadId: 'unknown',
+              topicId: payload.topicId,
+              error: (e as Error).message,
+              timestamp: Date.now(),
+            });
+          }
+        }
+      );
+
+      // TODO: Add download_pause and download_resume events to WebSocket schema
+      // socketService.onInbound('download_pause', ...)
+      // socketService.onInbound('download_resume', ...)
+
+      socketService.onInbound('request_download_sessions', async cid => {
+        try {
+          const sessions = await downloadOrchestrator.listSessions();
+          socketService.emit('download_sessions_snapshot', { sessions });
+        } catch (e) {
+          logger.error('request_download_sessions failed', { cid, error: e });
+        }
+      });
     }
   } else {
     // Fallback: serve channels from env if provided
@@ -539,6 +595,14 @@ export async function createBackendServices(): Promise<BackendServices> {
   );
   await uploadOrchestrator.recoverDanglingSessions();
 
+  const downloadOrchestrator = new DownloadOrchestrator(
+    telegramService as ITelegramService,
+    storage,
+    socketService,
+    scheduler,
+    { maxParallelDownloads: 1, persistIntervalMs: 60_000 }
+  );
+
   if (hasHealthProvider(socketService)) {
     socketService.setHealthProvider(() => ({
       status: 'ok',
@@ -556,6 +620,11 @@ export async function createBackendServices(): Promise<BackendServices> {
       await uploadOrchestrator.shutdown();
     } catch (e) {
       logger.error('UploadOrchestrator shutdown error', { e });
+    }
+    try {
+      await downloadOrchestrator.shutdown();
+    } catch (e) {
+      logger.error('DownloadOrchestrator shutdown error', { e });
     }
     try {
       await scheduler.stop();
@@ -598,6 +667,7 @@ export async function createBackendServices(): Promise<BackendServices> {
     socketService,
     scheduler,
     uploadOrchestrator,
+    downloadOrchestrator,
     shutdown,
     startedAt,
   };

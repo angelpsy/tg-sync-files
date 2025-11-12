@@ -4,6 +4,7 @@
  */
 
 import type {
+  IDownloadOrchestrator,
   IFSService,
   ISchedulerService,
   ISocketService,
@@ -19,6 +20,7 @@ import type {
 export interface IServiceRegistry {
   fsService: IFSService;
   uploadOrchestrator: IUploadOrchestrator;
+  downloadOrchestrator: IDownloadOrchestrator;
   telegramService: ITelegramService;
   storageService: IStorageService;
   socketService: ISocketService;

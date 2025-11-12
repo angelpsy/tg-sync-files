@@ -3,11 +3,42 @@
  */
 
 /**
- * Upload status enum
+ * Unified operation status enum for both upload and download operations
+ */
+export const EOperationStatus = {
+  PENDING: 'pending',
+  IN_PROGRESS: 'in_progress', // covers both 'uploading' and 'downloading'
+  PAUSED: 'paused',
+  COMPLETED: 'completed',
+  PARTIAL: 'partial',
+  FAILED: 'failed',
+  SKIPPED: 'skipped', // For files that are skipped (already exist, etc.)
+} as const;
+
+export type TOperationStatus = (typeof EOperationStatus)[keyof typeof EOperationStatus];
+
+/**
+ * Database-compatible OperationStatus enum (UPPERCASE values for Prisma)
+ */
+export const EOperationStatusDB = {
+  PENDING: 'PENDING',
+  IN_PROGRESS: 'IN_PROGRESS',
+  PAUSED: 'PAUSED',
+  COMPLETED: 'COMPLETED',
+  PARTIAL: 'PARTIAL',
+  FAILED: 'FAILED',
+  SKIPPED: 'SKIPPED',
+} as const;
+
+export type TOperationStatusDB = (typeof EOperationStatusDB)[keyof typeof EOperationStatusDB];
+
+/**
+ * Legacy upload status enum - kept for backward compatibility
+ * @deprecated Use EOperationStatus instead
  */
 export const EUploadStatus = {
   PENDING: 'pending',
-  UPLOADING: 'uploading',
+  UPLOADING: 'in_progress', // mapped to IN_PROGRESS
   PAUSED: 'paused',
   COMPLETED: 'completed',
   PARTIAL: 'partial',
@@ -17,11 +48,12 @@ export const EUploadStatus = {
 export type TUploadStatus = (typeof EUploadStatus)[keyof typeof EUploadStatus];
 
 /**
- * Database-compatible UploadStatus enum (UPPERCASE values for Prisma)
+ * Legacy database-compatible UploadStatus enum
+ * @deprecated Use EOperationStatusDB instead
  */
 export const EUploadStatusDB = {
   PENDING: 'PENDING',
-  UPLOADING: 'UPLOADING',
+  UPLOADING: 'IN_PROGRESS', // mapped to IN_PROGRESS
   PAUSED: 'PAUSED',
   COMPLETED: 'COMPLETED',
   PARTIAL: 'PARTIAL',
@@ -29,6 +61,18 @@ export const EUploadStatusDB = {
 } as const;
 
 export type TUploadStatusDB = (typeof EUploadStatusDB)[keyof typeof EUploadStatusDB];
+
+/**
+ * Download status enum - unified with upload
+ */
+export const EDownloadStatus = EOperationStatus;
+export type TDownloadStatus = TOperationStatus;
+
+/**
+ * Database-compatible DownloadStatus enum - unified with upload
+ */
+export const EDownloadStatusDB = EOperationStatusDB;
+export type TDownloadStatusDB = TOperationStatusDB;
 
 /**
  * Sync status enum

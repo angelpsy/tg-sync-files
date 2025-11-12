@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useChannels } from '@/entities/channel/useChannels';
 import { useChannelStatuses } from '@/entities/channel/useChannelStatuses';
-import { useTopicFiles, useTopics } from '@/entities/topic';
+import { useTopicFiles, useTopicFilesList, useTopics } from '@/entities/topic';
+import { FileDownloadWidget } from '@/widgets/file-download';
 
 export function TopicsDashboard() {
   const { channels, single } = useChannels();
@@ -17,6 +18,7 @@ export function TopicsDashboard() {
   const { statuses } = useChannelStatuses();
   const [expandedTopicId, setExpandedTopicId] = useState<string | undefined>(undefined);
   const { records, originalFolders } = useTopicFiles(expandedTopicId);
+  const { files } = useTopicFilesList(expandedTopicId, selectedChannelId);
 
   const list = useMemo(() => topics, [topics]);
   const selectedChannel = useMemo(
@@ -82,8 +84,17 @@ export function TopicsDashboard() {
                       </Badge>
                     )}
                   </div>
-                  {open && (
-                    <div className="pl-6 mt-2">
+                  {open && selectedChannelId && (
+                    <div className="pl-6 mt-2 space-y-4">
+                      {/* Download Section */}
+                      <FileDownloadWidget
+                        topicId={t.id}
+                        channelId={selectedChannelId}
+                        files={files}
+                        className="mb-4"
+                      />
+
+                      {/* Existing Files Records */}
                       {originalFolders.length > 0 && (
                         <div className="text-muted-foreground mb-2">
                           Original folders: {originalFolders.join(', ')}

@@ -4,10 +4,14 @@
 
 import type { TFileHashStrategy, TUploadConflictPolicy } from './enums.js';
 import type {
+  IDownloadProgress,
+  IDownloadResult,
+  IDownloadSession,
   IFileChangeEvent,
   IFileInfo,
   IFolderTree,
   ISyncDiffResult,
+  ITopicFileInfo,
   IUploadProgress,
   IUploadResult,
   IUploadSession,
@@ -146,4 +150,75 @@ export interface IUploadOrchestrator {
    * Lists in-memory (and optionally persisted) upload sessions for reconnect snapshots
    */
   listSessions(): Promise<IUploadSession[]>;
+}
+
+/**
+ * Download Orchestrator Interface
+ * Orchestrates download of files from Telegram topics to local folders.
+ * Provides session management, progress tracking, and duplicate checking.
+ */
+export interface IDownloadOrchestrator {
+  /**
+   * Starts download session from topic to local folder
+   */
+  startDownload(
+    topicId: string,
+    channelId: string,
+    targetPath: string,
+    opts?: {
+      selectedFiles?: string[]; // if provided, download only these files
+      overwriteExisting?: boolean; // default: false
+    }
+  ): Promise<IDownloadSession>;
+
+  /**
+   * Pauses download session
+   */
+  pauseDownload(sessionId: string): Promise<void>;
+
+  /**
+   * Resumes download session
+   */
+  resumeDownload(sessionId: string): Promise<void>;
+
+  /**
+   * Cancels download session
+   */
+  cancelDownload(sessionId: string): Promise<void>;
+
+  /**
+   * Gets download progress
+   */
+  getDownloadProgress(sessionId: string): Promise<IDownloadProgress>;
+
+  /**
+   * Gets download result
+   */
+  getDownloadResult(sessionId: string): Promise<IDownloadResult>;
+
+  /**
+   * Lists all files in a topic (for UI file selection)
+   */
+  listTopicFiles(topicId: string, channelId: string): Promise<ITopicFileInfo[]>;
+
+  /**
+   * Checks which files from topic already exist in target folder
+   * Returns array of existing filenames (name + extension check only)
+   */
+  checkExistingFiles(topicId: string, channelId: string, targetPath: string): Promise<string[]>;
+
+  /**
+   * Graceful shutdown: flush persistence and cleanup resources
+   */
+  shutdown(): Promise<void>;
+
+  /**
+   * Lists in-memory (and optionally persisted) download sessions
+   */
+  listSessions(): Promise<IDownloadSession[]>;
+
+  /**
+   * Resumes all paused sessions (for service restart)
+   */
+  resumeAllSessions(): Promise<void>;
 }

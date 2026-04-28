@@ -42,6 +42,7 @@ export class TelegramService implements ITelegramService {
   // Stepwise auth state
   private authPhone?: string;
   private phoneCodeHash?: string;
+  private hasRestoredSession = false;
 
   constructor(
     private storageService: IStorageService,
@@ -58,13 +59,20 @@ export class TelegramService implements ITelegramService {
       this.logger.info('Initializing Telegram client...');
       const savedSession = await this.storageService.getTelegramSession();
       const stringSession = savedSession?.sessionData || savedSession?.stringSession || '';
+      this.hasRestoredSession = Boolean(stringSession);
 
       this.client = new TelegramClient(new StringSession(stringSession), this.apiId, this.apiHash, {
         connectionRetries: this.retryConfig.maxAttempts,
       });
 
       this.isInitialized = true;
-      this.logger.info('Telegram client initialized successfully');
+      this.logger.info('Telegram client initialized successfully', {
+        hasSavedSession: this.hasRestoredSession,
+      });
+
+      if (this.hasRestoredSession) {
+        await this.tryRestoreSessionOnStartup();
+      }
     } catch (error) {
       this.logger.error(error as Error, 'Failed to initialize Telegram client');
       throw error;
@@ -553,6 +561,7 @@ export class TelegramService implements ITelegramService {
       return false;
     }
     try {
+      await this.ensureClientConnected();
       this.logger.debug('checkSession: calling getMe()...');
       await this.getClient().getMe();
       this.logger.info('checkSession: session is active');
@@ -569,6 +578,7 @@ export class TelegramService implements ITelegramService {
   async getMeMinimal(): Promise<ITelegramUserMinimal | null> {
     if (!this.client) return null;
     try {
+      await this.ensureClientConnected();
       const me = await this.getClient().getMe();
       // me can be an object with properties username, phone, firstName, lastName, id
       // We keep it defensive to avoid direct GramJS type coupling
@@ -698,6 +708,28 @@ export class TelegramService implements ITelegramService {
     }
   }
 
+  private async ensureClientConnected(): Promise<void> {
+    this.ensureInitialized();
+    const client = this.getClient();
+    await client.connect();
+  }
+
+  private async tryRestoreSessionOnStartup(): Promise<void> {
+    try {
+      this.logger.info('Attempting to restore Telegram session from storage...');
+      await this.ensureClientConnected();
+      const me = await this.getClient().getMe();
+      const id = (me as unknown as { id?: bigint | number | string })?.id;
+      this.logger.info('Telegram session restored successfully', {
+        userId: id ? id.toString() : undefined,
+      });
+    } catch (error) {
+      this.logger.warn('Stored Telegram session could not be restored', {
+        error: (error as Error).message,
+      });
+    }
+  }
+
   /** Find channel by id (in-memory helper) */
   private async getChannelById(channelId: string): Promise<ITelegramChannel | null> {
     if (this.channelCache) return this.channelCache.find(c => c.id === channelId) || null;
@@ -732,8 +764,14 @@ export class TelegramService implements ITelegramService {
   }
 
   private async executeWithRetry<T>(name: string, op: () => Promise<T>): Promise<T> {
-    return this.retryManager.execute(op, (attempt, error) => {
-      this.logger.warn(`Retry ${name} attempt=${attempt} error=${(error as Error).message}`);
-    });
+    return this.retryManager.execute(
+      async () => {
+        await this.ensureClientConnected();
+        return op();
+      },
+      (attempt, error) => {
+        this.logger.warn(`Retry ${name} attempt=${attempt} error=${(error as Error).message}`);
+      }
+    );
   }
 }

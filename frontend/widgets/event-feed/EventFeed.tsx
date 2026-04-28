@@ -1,5 +1,6 @@
 'use client';
 import type { EventPayloadMap, TEventName } from '@/types/websocket/events';
+import { WSEvent } from '@/types/websocket/events';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -8,18 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { on } from '@/shared/api/ws/events';
 
 const SUBSCRIBED_EVENTS: TEventName[] = [
-  'file_sync_start',
-  'file_sync_progress',
-  'file_sync_complete',
-  'file_sync_error',
-  'upload_start',
-  'upload_progress',
-  'upload_complete',
-  'upload_error',
-  'upload_file_event',
-  'sync_diff',
-  'folder_tree_update',
-  'channel_status_update',
+  WSEvent.FILE_SYNC_START,
+  WSEvent.FILE_SYNC_PROGRESS,
+  WSEvent.FILE_SYNC_COMPLETE,
+  WSEvent.FILE_SYNC_ERROR,
+  WSEvent.UPLOAD_START,
+  WSEvent.UPLOAD_PROGRESS,
+  WSEvent.UPLOAD_COMPLETE,
+  WSEvent.UPLOAD_ERROR,
+  WSEvent.UPLOAD_FILE_EVENT,
+  WSEvent.SYNC_DIFF,
+  WSEvent.FOLDER_TREE_UPDATE,
+  WSEvent.CHANNEL_STATUS_UPDATE,
 ];
 
 type FeedItem = { id: string; event: TEventName; payload: unknown; ts: number };

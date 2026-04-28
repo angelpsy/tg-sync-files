@@ -50,21 +50,21 @@ interface DbTelegramSession {
   updatedAt: Date;
 }
 
-import { serviceLoggers } from '../../../../shared/logger';
-
-import type { IStorageService } from '@/types/common';
+import { serviceLoggers } from '../../../../shared/logger.mts';
+import * as fileSyncEnums from '../../../../types/file-sync/enums.js';
 import type {
   IFileRecord,
   IFolderTopicLink,
   IUploadSession,
   TUploadStatusDB,
-} from '@/types/file-sync';
-import { mapUploadStatusFromPrisma, mapUploadStatusToPrisma } from '@/types/file-sync';
-import type { ITelegramChannel, ITelegramSession } from '@/types/telegram';
+} from '../../../../types/file-sync/index.js';
+import type { IStorageService } from '../../../../types/index.js';
+import type { ITelegramChannel, ITelegramSession } from '../../../../types/telegram/index.js';
+const { mapUploadStatusFromPrisma, mapUploadStatusToPrisma } = fileSyncEnums;
 
 /**
  * Storage Service
- * Manages data in PostgreSQL via Prisma ORM
+ * Manages data in SQLite via Prisma ORM
  */
 export class StorageService implements IStorageService {
   private readonly logger = serviceLoggers.storage;

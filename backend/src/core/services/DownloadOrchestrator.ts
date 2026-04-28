@@ -3,19 +3,17 @@ import { existsSync } from 'fs';
 import { mkdir } from 'fs/promises';
 import { join } from 'path';
 
-import { serviceLoggers } from '../../../../shared/logger';
-
-import type { ISchedulerService, IStorageService } from '@/types/common';
-import {
-  EOperationStatus,
-  type IDownloadOrchestrator,
-  type IDownloadProgress,
-  type IDownloadResult,
-  type IDownloadSession,
-  type ITopicFileInfo,
-} from '@/types/file-sync';
-import type { ITelegramService } from '@/types/telegram';
-import type { ISocketService } from '@/types/websocket';
+import { serviceLoggers } from '../../../../shared/logger.mts';
+import type { ISchedulerService, IStorageService } from '../../../../types/common/index.js';
+import type {
+  IDownloadOrchestrator,
+  IDownloadProgress,
+  IDownloadResult,
+  IDownloadSession,
+  ITopicFileInfo,
+} from '../../../../types/file-sync/index.js';
+import * as FileSyncTypes from '../../../../types/file-sync/index.js';
+const { EOperationStatus } = FileSyncTypes;
 
 interface DownloadOrchestratorOptions {
   maxParallelDownloads: number; // currently 1

@@ -1,5 +1,11 @@
 'use client';
-import type { IUploadCompleteEvent, IUploadProgress, IUploadSession } from '@/types/file-sync';
+import type {
+  IUploadCompleteEvent,
+  IUploadProgress,
+  IUploadSession,
+  TUploadStatus,
+} from '@/types/file-sync';
+import { WSEvent } from '@/types/websocket/events';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { emit, on } from '@/shared/api/ws/events';
@@ -15,10 +21,10 @@ export function useUploadSessions() {
 
   useEffect(() => {
     // Snapshot
-    const offSnap = on('upload_sessions_snapshot', payload => {
+    const offSnap = on(WSEvent.UPLOAD_SESSIONS_SNAPSHOT, payload => {
       const nextById = new Map<string, IUploadSession>();
       const nextByFolder = new Map<string, string[]>();
-      for (const s of payload.sessions || []) {
+      for (const s of (payload as { sessions: IUploadSession[] }).sessions || []) {
         nextById.set(s.id, s);
         const arr = nextByFolder.get(s.folderPath) || [];
         arr.push(s.id);
@@ -26,72 +32,84 @@ export function useUploadSessions() {
       }
       setState({ byId: nextById, byFolder: nextByFolder });
     });
-    // Live events (best effort)
-    const offStart = on('upload_start', ev => {
+
+    // Live events
+    const offStart = on(WSEvent.UPLOAD_START, ev => {
+      const payload = ev as {
+        uploadId: string;
+        folderPath: string;
+        topicId: string;
+        totalFiles: number;
+      };
       setState(prev => {
         const byId = new Map(prev.byId);
         const byFolder = new Map(prev.byFolder);
         const s: IUploadSession = {
-          id: ev.uploadId,
-          folderPath: ev.folderPath,
-          topicId: ev.topicId,
-          status: 'uploading',
-          totalFiles: ev.totalFiles,
+          id: payload.uploadId,
+          folderPath: payload.folderPath,
+          topicId: payload.topicId,
+          status: 'in_progress' as TUploadStatus,
+          totalFiles: payload.totalFiles,
           uploadedFiles: 0,
           currentFile: '',
           progress: 0,
           startedAt: new Date(),
           updatedAt: new Date(),
-        } as IUploadSession;
+        };
         byId.set(s.id, s);
-        const arr = byFolder.get(s.folderPath) || [];
+        const arr = [...(byFolder.get(s.folderPath) || [])];
         if (!arr.includes(s.id)) arr.push(s.id);
         byFolder.set(s.folderPath, arr);
         return { byId, byFolder };
       });
     });
-    const offProg = on('upload_progress', ev => {
-      lastProgress.current.set(ev.uploadId, ev);
+
+    const offProg = on(WSEvent.UPLOAD_PROGRESS, ev => {
+      const payload = ev as IUploadProgress;
+      lastProgress.current.set(payload.uploadId, payload);
       setState(prev => {
         const byId = new Map(prev.byId);
-        const s = byId.get(ev.uploadId);
+        const s = byId.get(payload.uploadId);
         if (s) {
-          const uploadedFiles = Math.max(ev.fileIndex, s.uploadedFiles);
+          const uploadedFiles = Math.max(payload.fileIndex, s.uploadedFiles);
           const progress = Math.round((uploadedFiles / (s.totalFiles || 1)) * 100);
-          byId.set(ev.uploadId, {
+          byId.set(payload.uploadId, {
             ...s,
             uploadedFiles,
-            currentFile: ev.fileName,
+            currentFile: payload.fileName,
             progress,
             updatedAt: new Date(),
-          } as IUploadSession);
+          });
         }
         return { ...prev, byId };
       });
     });
-    const offDone = on('upload_complete', (ev: IUploadCompleteEvent) => {
+
+    const offDone = on(WSEvent.UPLOAD_COMPLETE, ev => {
+      const payload = ev as IUploadCompleteEvent;
       setState(prev => {
         const byId = new Map(prev.byId);
-        const s = byId.get(ev.uploadId);
+        const s = byId.get(payload.uploadId);
         if (s) {
-          byId.set(ev.uploadId, {
+          byId.set(payload.uploadId, {
             ...s,
-            status: ev.hasFailures ? 'partial' : 'completed',
-            uploadedFiles: ev.uploadedFiles,
+            status: (payload.hasFailures ? 'partial' : 'completed') as TUploadStatus,
+            uploadedFiles: payload.uploadedFiles,
             progress: 100,
             updatedAt: new Date(),
             completedAt: new Date(),
-          } as IUploadSession);
+          });
         }
         return { ...prev, byId };
       });
     });
-    const offErr = on('upload_error', () => {
-      // Snapshot will reflect final state; keep minimal here
+
+    const offErr = on(WSEvent.UPLOAD_ERROR, () => {
+      // Snapshot will reflect final state
     });
 
     // Request initial snapshot on mount
-    emit('request_upload_sessions', {});
+    emit(WSEvent.REQUEST_UPLOAD_SESSIONS, {});
 
     return () => {
       offSnap();
@@ -105,13 +123,10 @@ export function useUploadSessions() {
   const latestByFolder = useMemo(() => {
     const out = new Map<string, IUploadSession | undefined>();
     state.byFolder.forEach((ids, folder) => {
-      // pick most recently updated
-      const sorted = [...ids]
+      const sorted = ids
         .map(id => state.byId.get(id))
         .filter((s): s is IUploadSession => !!s)
-        .sort(
-          (a, b) => (new Date(b.updatedAt).getTime() || 0) - (new Date(a.updatedAt).getTime() || 0)
-        );
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
       out.set(folder, sorted[0]);
     });
     return out;
@@ -123,5 +138,14 @@ export function useUploadSessions() {
       return latestByFolder.get(folderPath);
     },
     raw: state,
+    pause(id: string) {
+      emit(WSEvent.PAUSE_UPLOAD, { uploadId: id });
+    },
+    resume(id: string) {
+      emit(WSEvent.RESUME_UPLOAD, { uploadId: id });
+    },
+    cancel(id: string) {
+      emit(WSEvent.CANCEL_UPLOAD, { uploadId: id });
+    },
   } as const;
 }

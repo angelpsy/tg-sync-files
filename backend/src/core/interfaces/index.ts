@@ -11,7 +11,7 @@ import type {
   IStorageService,
   ITelegramService,
   IUploadOrchestrator,
-} from '@/types';
+} from '../../../types/index.js';
 
 /**
  * Service Registry Interface

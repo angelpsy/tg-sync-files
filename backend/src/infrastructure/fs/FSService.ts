@@ -3,9 +3,13 @@ import { basename, join, relative } from 'path';
 
 import chokidar from 'chokidar';
 
-import { serviceLoggers } from '../../../../shared/logger';
-
-import type { IFileChangeEvent, IFileInfo, IFolderTree, IFSService } from '@/types';
+import { serviceLoggers } from '../../../../shared/logger.mts';
+import type {
+  IFileChangeEvent,
+  IFileInfo,
+  IFolderTree,
+  IFSService,
+} from '../../../../types/index.js';
 
 /**
  * Options for FSService

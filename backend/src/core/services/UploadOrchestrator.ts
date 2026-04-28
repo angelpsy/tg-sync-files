@@ -2,27 +2,25 @@ import { createHash, randomUUID } from 'crypto';
 import { readdir, stat } from 'fs/promises';
 import { join, parse } from 'path';
 
-import { serviceLoggers } from '../../../../shared/logger';
-
-import type { ISchedulerService, IStorageService } from '@/types/common';
-import {
-  EFileHashStrategy,
-  EUploadConflictPolicy,
-  EUploadStatus,
-  type IFSService,
-  type IFileInfo,
-  type IFileRecord,
-  type ISyncDiffResult,
-  type ITopicFileInfo,
-  type IUploadOrchestrator,
-  type IUploadProgress,
-  type IUploadResult,
-  type IUploadSession,
-  type TFileHashStrategy,
-  type TUploadConflictPolicy,
-} from '@/types/file-sync';
-import type { ITelegramService } from '@/types/telegram';
-import type { ISocketService } from '@/types/websocket';
+import { serviceLoggers } from '../../../../shared/logger.mts';
+import type { ISchedulerService, IStorageService } from '../../../../types/common/index.js';
+import type {
+  IFSService,
+  IFileInfo,
+  IFileRecord,
+  ISyncDiffResult,
+  ITopicFileInfo,
+  IUploadOrchestrator,
+  IUploadProgress,
+  IUploadResult,
+  IUploadSession,
+  TFileHashStrategy,
+  TUploadConflictPolicy,
+} from '../../../../types/file-sync/index.js';
+import * as FileSyncTypes from '../../../../types/file-sync/index.js';
+import type { ITelegramService } from '../../../../types/telegram/index.js';
+import type { ISocketService } from '../../../../types/websocket/index.js';
+const { EFileHashStrategy, EUploadConflictPolicy, EUploadStatus } = FileSyncTypes;
 
 interface UploadOrchestratorOptions {
   maxParallelUploads: number; // currently 1

@@ -9,6 +9,7 @@ import type {
   IDownloadProgress,
   IDownloadSession,
   IDownloadStartEvent,
+  IFileRecord,
   IFileSyncEvent,
   ISyncDiffResult,
   ITopicFileInfo,
@@ -29,74 +30,12 @@ import type {
 // Protocol version for WS messages (bump when breaking wire changes occur)
 export const WS_PROTOCOL_VERSION = 1 as const;
 
-// Canonical event name union (string literal types)
-export const EventNames = [
-  // File sync lifecycle
-  'file_sync_start',
-  'file_sync_progress',
-  'file_sync_complete',
-  'file_sync_error',
-  // Upload lifecycle
-  'upload_start',
-  'upload_progress',
-  'upload_complete',
-  'upload_error',
-  'upload_file_event',
-  // Download lifecycle
-  'download_start',
-  'download_progress',
-  'download_complete',
-  'download_error',
-  'download_file_event',
-  // Diff
-  'sync_diff',
-  // FS / system
-  'folder_tree_update',
-  'channel_status_update',
-  // Telegram data snapshots
-  'channels_snapshot',
-  'topics_snapshot',
-  'topic_files_snapshot',
-  // Client requests (inbound)
-  'request_channels',
-  'request_topics',
-  'request_topic_files',
-  // Upload control (requests)
-  'start_folder_upload',
-  'start_bulk_folder_upload',
-  'request_upload_sessions',
-  // Download control (requests)
-  'start_topic_download',
-  'pause_download',
-  'resume_download',
-  'cancel_download',
-  'request_download_sessions',
-  'request_topic_files',
-  // Upload control (requests)
-  'start_folder_upload',
-  'start_bulk_folder_upload',
-  'request_upload_sessions',
-  // Auth flow (requests)
-  'auth_init',
-  'auth_code',
-  'auth_password',
-  'auth_logout',
-  // Auth flow (responses)
-  'auth_pending_code',
-  'auth_pending_password',
-  'auth_success',
-  'auth_error',
-  // Auth state broadcast
-  'auth_state',
-  // Client request for auth state
-  'request_auth_state',
-  // Upload sessions snapshot (responses)
-  'upload_sessions_snapshot',
-  // Download sessions snapshot (responses)
-  'download_sessions_snapshot',
-] as const;
+// Canonical event names
+import { WSEvent } from './WSEvent';
+export { WSEvent };
 
-export type TEventName = (typeof EventNames)[number];
+export type TEventName = WSEvent;
+export const EventNames = Object.values(WSEvent) as TEventName[];
 
 // Mapping of event name to payload type
 export interface EventPayloadMap {
@@ -120,7 +59,12 @@ export interface EventPayloadMap {
   // Snapshots
   channels_snapshot: ITelegramChannel[];
   topics_snapshot: { channelId: string; topics: ITopic[] };
-  topic_files_snapshot: { topicId: string; files: ITopicFileInfo[] };
+  topic_files_snapshot: {
+    topicId: string;
+    files: ITopicFileInfo[];
+    records: IFileRecord[];
+    originalFolders: string[];
+  };
   // Requests (client -> server)
   request_channels: Record<string, never>;
   request_topics: { channelId: string };
@@ -145,6 +89,9 @@ export interface EventPayloadMap {
     hashStrategy?: 'none' | 'on_demand' | 'eager';
   }>;
   request_upload_sessions: Record<string, never>;
+  pause_upload: { uploadId: string };
+  resume_upload: { uploadId: string };
+  cancel_upload: { uploadId: string };
   // Download control (client -> server)
   start_topic_download: {
     topicId: string;

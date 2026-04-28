@@ -5,62 +5,62 @@
 /**
  * Unified operation status enum for both upload and download operations
  */
-export const EOperationStatus = {
-  PENDING: 'pending',
-  IN_PROGRESS: 'in_progress', // covers both 'uploading' and 'downloading'
-  PAUSED: 'paused',
-  COMPLETED: 'completed',
-  PARTIAL: 'partial',
-  FAILED: 'failed',
-  SKIPPED: 'skipped', // For files that are skipped (already exist, etc.)
-} as const;
+export enum EOperationStatus {
+  PENDING = 'pending',
+  IN_PROGRESS = 'in_progress', // covers both 'uploading' and 'downloading'
+  PAUSED = 'paused',
+  COMPLETED = 'completed',
+  PARTIAL = 'partial',
+  FAILED = 'failed',
+  SKIPPED = 'skipped', // For files that are skipped (already exist, etc.)
+}
 
-export type TOperationStatus = (typeof EOperationStatus)[keyof typeof EOperationStatus];
+export type TOperationStatus = EOperationStatus;
 
 /**
  * Database-compatible OperationStatus enum (UPPERCASE values for Prisma)
  */
-export const EOperationStatusDB = {
-  PENDING: 'PENDING',
-  IN_PROGRESS: 'IN_PROGRESS',
-  PAUSED: 'PAUSED',
-  COMPLETED: 'COMPLETED',
-  PARTIAL: 'PARTIAL',
-  FAILED: 'FAILED',
-  SKIPPED: 'SKIPPED',
-} as const;
+export enum EOperationStatusDB {
+  PENDING = 'PENDING',
+  IN_PROGRESS = 'IN_PROGRESS',
+  PAUSED = 'PAUSED',
+  COMPLETED = 'COMPLETED',
+  PARTIAL = 'PARTIAL',
+  FAILED = 'FAILED',
+  SKIPPED = 'SKIPPED',
+}
 
-export type TOperationStatusDB = (typeof EOperationStatusDB)[keyof typeof EOperationStatusDB];
+export type TOperationStatusDB = EOperationStatusDB;
 
 /**
  * Legacy upload status enum - kept for backward compatibility
  * @deprecated Use EOperationStatus instead
  */
-export const EUploadStatus = {
-  PENDING: 'pending',
-  UPLOADING: 'in_progress', // mapped to IN_PROGRESS
-  PAUSED: 'paused',
-  COMPLETED: 'completed',
-  PARTIAL: 'partial',
-  FAILED: 'failed',
-} as const;
+export enum EUploadStatus {
+  PENDING = 'pending',
+  UPLOADING = 'in_progress', // mapped to IN_PROGRESS
+  PAUSED = 'paused',
+  COMPLETED = 'completed',
+  PARTIAL = 'partial',
+  FAILED = 'failed',
+}
 
-export type TUploadStatus = (typeof EUploadStatus)[keyof typeof EUploadStatus];
+export type TUploadStatus = EUploadStatus;
 
 /**
  * Legacy database-compatible UploadStatus enum
  * @deprecated Use EOperationStatusDB instead
  */
-export const EUploadStatusDB = {
-  PENDING: 'PENDING',
-  UPLOADING: 'IN_PROGRESS', // mapped to IN_PROGRESS
-  PAUSED: 'PAUSED',
-  COMPLETED: 'COMPLETED',
-  PARTIAL: 'PARTIAL',
-  FAILED: 'FAILED',
-} as const;
+export enum EUploadStatusDB {
+  PENDING = 'PENDING',
+  UPLOADING = 'IN_PROGRESS', // mapped to IN_PROGRESS
+  PAUSED = 'PAUSED',
+  COMPLETED = 'COMPLETED',
+  PARTIAL = 'PARTIAL',
+  FAILED = 'FAILED',
+}
 
-export type TUploadStatusDB = (typeof EUploadStatusDB)[keyof typeof EUploadStatusDB];
+export type TUploadStatusDB = EUploadStatusDB;
 
 /**
  * Download status enum - unified with upload
@@ -77,26 +77,26 @@ export type TDownloadStatusDB = TOperationStatusDB;
 /**
  * Sync status enum
  */
-export const ESyncStatus = {
-  PENDING: 'pending',
-  SYNCING: 'syncing',
-  COMPLETED: 'completed',
-  ERROR: 'error',
-} as const;
+export enum ESyncStatus {
+  PENDING = 'pending',
+  SYNCING = 'syncing',
+  COMPLETED = 'completed',
+  ERROR = 'error',
+}
 
-export type TSyncStatus = (typeof ESyncStatus)[keyof typeof ESyncStatus];
+export type TSyncStatus = ESyncStatus;
 
 /**
  * File system change type
  */
-export const EFileChangeType = {
-  CREATED: 'created',
-  MODIFIED: 'modified',
-  DELETED: 'deleted',
-  RENAMED: 'renamed',
-} as const;
+export enum EFileChangeType {
+  CREATED = 'created',
+  MODIFIED = 'modified',
+  DELETED = 'deleted',
+  RENAMED = 'renamed',
+}
 
-export type TFileChangeType = (typeof EFileChangeType)[keyof typeof EFileChangeType];
+export type TFileChangeType = EFileChangeType;
 
 /**
  * Upload conflict policy
@@ -104,14 +104,13 @@ export type TFileChangeType = (typeof EFileChangeType)[keyof typeof EFileChangeT
  * RENAME    – generate unique name (file (1).ext, file (2).ext ...)
  * LOG_ONLY  – upload anyway even if duplicate (may create remote duplicates)
  */
-export const EUploadConflictPolicy = {
-  SKIP: 'skip',
-  RENAME: 'rename',
-  LOG_ONLY: 'log_only',
-} as const;
+export enum EUploadConflictPolicy {
+  SKIP = 'skip',
+  RENAME = 'rename',
+  LOG_ONLY = 'log_only',
+}
 
-export type TUploadConflictPolicy =
-  (typeof EUploadConflictPolicy)[keyof typeof EUploadConflictPolicy];
+export type TUploadConflictPolicy = EUploadConflictPolicy;
 
 /**
  * File hash strategy (placeholder for future hashing enhancement)
@@ -119,13 +118,13 @@ export type TUploadConflictPolicy =
  * on_demand  – compute hash only if quick fingerprint (size+mtime) changed ambiguity detected
  * eager      – compute hash for every file during scan
  */
-export const EFileHashStrategy = {
-  NONE: 'none',
-  ON_DEMAND: 'on_demand',
-  EAGER: 'eager',
-} as const;
+export enum EFileHashStrategy {
+  NONE = 'none',
+  ON_DEMAND = 'on_demand',
+  EAGER = 'eager',
+}
 
-export type TFileHashStrategy = (typeof EFileHashStrategy)[keyof typeof EFileHashStrategy];
+export type TFileHashStrategy = EFileHashStrategy;
 
 /**
  * Mapping functions for enum conversion

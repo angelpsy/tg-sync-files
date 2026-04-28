@@ -17,75 +17,34 @@ describe('Database Configuration', () => {
   });
 
   describe('generateDatabaseUrl', () => {
-    it('should generate URL with all required fields', () => {
-      process.env.POSTGRES_USER = 'testuser';
-      process.env.POSTGRES_PASSWORD = 'testpass';
-      process.env.POSTGRES_DB = 'testdb';
-      process.env.POSTGRES_HOST = 'testhost';
-      process.env.POSTGRES_PORT = '5433';
+    it('should use DATABASE_URL when provided', () => {
+      process.env.DATABASE_URL = 'file:./custom.sqlite';
 
       const url = generateDatabaseUrl();
-      expect(url).toBe('postgresql://testuser:testpass@testhost:5433/testdb');
+      expect(url).toBe('file:./custom.sqlite');
     });
 
-    it('should use default host and port', () => {
-      process.env.POSTGRES_USER = 'testuser';
-      process.env.POSTGRES_PASSWORD = 'testpass';
-      process.env.POSTGRES_DB = 'testdb';
+    it('should use sqlite default when DATABASE_URL is missing', () => {
+      delete process.env.DATABASE_URL;
 
       const url = generateDatabaseUrl();
-      expect(url).toBe('postgresql://testuser:testpass@localhost:5432/testdb');
-    });
-
-    it('should throw error when POSTGRES_USER is missing', () => {
-      process.env.POSTGRES_PASSWORD = 'testpass';
-      process.env.POSTGRES_DB = 'testdb';
-
-      expect(() => generateDatabaseUrl()).toThrow('POSTGRES_USER environment variable is required');
-    });
-
-    it('should throw error when POSTGRES_PASSWORD is missing', () => {
-      process.env.POSTGRES_USER = 'testuser';
-      process.env.POSTGRES_DB = 'testdb';
-
-      expect(() => generateDatabaseUrl()).toThrow(
-        'POSTGRES_PASSWORD environment variable is required'
-      );
-    });
-
-    it('should throw error when POSTGRES_DB is missing', () => {
-      process.env.POSTGRES_USER = 'testuser';
-      process.env.POSTGRES_PASSWORD = 'testpass';
-
-      expect(() => generateDatabaseUrl()).toThrow('POSTGRES_DB environment variable is required');
+      expect(url).toBe('file:./dev.db');
     });
   });
 
   describe('getDatabaseConfig', () => {
-    it('should use DATABASE_URL when provided', () => {
-      process.env.DATABASE_URL = 'postgresql://custom:url@host:5432/db';
+    it('should return DATABASE_URL in config', () => {
+      process.env.DATABASE_URL = 'file:./runtime.db';
 
       const config = getDatabaseConfig();
-      expect(config.url).toBe('postgresql://custom:url@host:5432/db');
+      expect(config.url).toBe('file:./runtime.db');
     });
 
-    it('should generate URL when DATABASE_URL is not provided', () => {
+    it('should return sqlite default in config', () => {
       delete process.env.DATABASE_URL;
-      process.env.POSTGRES_USER = 'testuser';
-      process.env.POSTGRES_PASSWORD = 'testpass';
-      process.env.POSTGRES_DB = 'testdb';
 
       const config = getDatabaseConfig();
-      expect(config.url).toBe('postgresql://testuser:testpass@localhost:5432/testdb');
-    });
-
-    it('should throw wrapped error when configuration fails', () => {
-      delete process.env.DATABASE_URL;
-      delete process.env.POSTGRES_USER;
-
-      expect(() => getDatabaseConfig()).toThrow(
-        'Database configuration failed: POSTGRES_USER environment variable is required'
-      );
+      expect(config.url).toBe('file:./dev.db');
     });
   });
 });

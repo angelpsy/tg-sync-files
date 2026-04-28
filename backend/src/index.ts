@@ -3,12 +3,11 @@
  * Single source of truth: service composition lives in createBackendServices (lib.ts).
  */
 export * from '../../types';
-export { createBackendServices } from './lib';
+import { createBackendServices } from './lib.js';
 
 // Direct run (node dist-vite/index.mjs) -> bootstrap via factory only once
 if (import.meta.url === `file://${process.argv[1]}`) {
-  import('./lib')
-    .then(m => m.createBackendServices())
+  createBackendServices()
     .then(svcs => {
       // eslint-disable-next-line no-console
       console.log('Backend services started', { wsPort: svcs.config.wsPort });

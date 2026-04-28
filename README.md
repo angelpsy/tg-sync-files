@@ -13,14 +13,14 @@ security review and thorough testing.
 Telegram File Sync is an experimental application that synchronizes files
 between Telegram and local/cloud storage. It provides a web UI and a backend
 service that interacts with Telegram via MTProto (gramJS), stores metadata in
-PostgreSQL (Prisma), and uses WebSocket (Socket.IO) for realtime updates. The
+SQLite (Prisma), and uses WebSocket (Socket.IO) for realtime updates. The
 project follows Feature-Sliced Design and Clean Architecture principles.
 
 ## High-level architecture and tech stack
 
 - Frontend: Next.js (TypeScript), shadcn/ui, Tailwind CSS
 - Backend: Node.js (TypeScript), Express / Socket.IO
-- Database: PostgreSQL with Prisma ORM
+- Database: SQLite with Prisma ORM
 - Telegram integration: gramJS (MTProto)
 - Realtime: WebSockets (Socket.IO)
 
@@ -49,7 +49,13 @@ pnpm install
   variables (database URL, Telegram credentials, etc.). The project expects
   environment variables to be declared at the repo root.
 
-3. Run services
+3. Sync SQLite schema
+
+```bash
+pnpm --filter backend prisma:sqlite:sync
+```
+
+4. Run services
 
 - Backend (from repo root or `backend/`):
 

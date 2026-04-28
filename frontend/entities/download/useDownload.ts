@@ -1,4 +1,5 @@
 'use client';
+import { WSEvent } from '@/types/websocket/events';
 import { useCallback } from 'react';
 
 import { emit } from '@/shared/api/ws/events';
@@ -13,7 +14,7 @@ export interface DownloadOptions {
 
 export function useDownload() {
   const startDownload = useCallback((options: DownloadOptions) => {
-    emit('start_topic_download', {
+    emit(WSEvent.START_TOPIC_DOWNLOAD, {
       topicId: options.topicId,
       channelId: options.channelId,
       targetPath: options.targetPath,

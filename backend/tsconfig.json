@@ -4,12 +4,13 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "node",
-    "noEmit": false,
-    "outDir": "./dist",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
 
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@/shared/*": ["../shared/*"],
       "@/types": ["../types"],
       "@/types/*": ["../types/*"]
     },

@@ -26,9 +26,9 @@
 🔧 Стек технологий • Frontend: Next.js (App Router) + TailwindCSS,
 аутентификация через NextAuth.js • Backend: Node.js (v24+) + WebSocket
 (Socket.IO) • TypeScript: latest (tsconfig.base.json общая конфигурация для Node
-и браузера) • ORM: Prisma • БД: PostgreSQL • Telegram API: MTProto через gramJS
-• Файловая система: Node.js fs, chokidar • Хранение сессии Telegram: в
-PostgreSQL • Docker сеть: default bridge, маппинг портов 3000/4000
+и браузера) • ORM: Prisma • БД: SQLite • Telegram API: MTProto через gramJS •
+Файловая система: Node.js fs, chokidar • Хранение сессии Telegram: в SQLite •
+Docker сеть: default bridge, маппинг портов 3000/4000
 
 - Валидация env: использовать dotenv-schema (схема в docs/env.schema.json)
 - TELEGRAM_CHANNEL_IDS передаётся как CSV-строка
@@ -96,7 +96,7 @@ PostgreSQL • Docker сеть: default bridge, маппинг портов 3000
 ### ⚙️ Технические детали
 
 Telegram API (GramJS + MTProto): • Авторизация через api_id и api_hash из .env.
-• Используется Telegram user session. • Сессия сохраняется в PostgreSQL. • Если
+• Используется Telegram user session. • Сессия сохраняется в SQLite. • Если
 Telegram API вернёт ошибку авторизации — автоматически переавторизуемся (в
 фоне). • Ретрай с экспоненциальным бэкоффом: старт 10 сек, максимум 1 час, без
 ограничения числа попыток; UI поддерживает команды `pause` и `stop` для
@@ -117,7 +117,7 @@ Telegram • Проверяет дубликаты • Хранит статус
 Инициализация сессии • Работа с каналами и топиками • Загрузка и выгрузка файлов
 
 4. StorageService • Хранит связи папка ↔ топик, список каналов, Telegram-сессию
-   • Работа через Prisma/PostgreSQL
+   • Работа через Prisma/SQLite
 5. UI/WebSocket Layer • Две вкладки: • Local => TG (локальные папки) • TG =>
    Local (топики) • Отображение дерева, статуса загрузки, ошибок • Коммуникация
    с бэкендом через WebSocket (Socket.IO) • Для выгрузки файлов из топика
@@ -147,7 +147,7 @@ Telegram • Проверяет дубликаты • Хранит статус
 - OpenAPI валидирована (`swagger-cli validate`)
 - SDK-клиент сгенерирован и импортируется без ошибок во frontend
 
-🧩 База данных (PostgreSQL)
+🧩 База данных (SQLite)
 
 Таблицы
 

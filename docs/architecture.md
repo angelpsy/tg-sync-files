@@ -296,7 +296,7 @@ sequenceDiagram
 | FSService       | chokidar, Node.js fs     | Адаптер           |
 | SyncService     | TelegramService, Storage | Интерфейсы        |
 | TelegramService | GramJS, MTProto          | Адаптер           |
-| StorageService  | Prisma, PostgreSQL       | Адаптер           |
+| StorageService  | Prisma, SQLite           | Адаптер           |
 | Все сервисы     | DTO/контракты            | TypeScript        |
 
 > **Важно:** Ни один инфраструктурный слой (fs, telegram, storage, ws) не должен
@@ -378,37 +378,20 @@ sequenceDiagram
 | API Gateway     | FSService       | Внутренние вызовы (Node)     | Инициация сканирования, обновление дерева       |
 | API Gateway     | SyncService     | Вызовы (Node/TS-интерфейсы)  | Загрузка/выгрузка файлов                        |
 | SyncService     | TelegramService | Promise API / GramJS API     | Работа с топиками и сообщениями                 |
-| Все сервисы     | DB              | Prisma (PostgreSQL)          | Работа с данными: топики, каналы, файлы, сессии |
+| Все сервисы     | DB              | Prisma (SQLite)              | Работа с данными: топики, каналы, файлы, сессии |
 | TelegramService | Telegram API    | MTProto (GramJS)             | Работа с Telegram user session                  |
 
 docker-compose.yml
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15
-    container_name: tgstore_postgres
-    restart: always
-    environment:
-      POSTGRES_USER: tguser
-      POSTGRES_PASSWORD: tgpass
-      POSTGRES_DB: tgstorage
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
   backend:
     build: ./backend
     container_name: tgstore_backend
-    depends_on:
-  pattern?: string;
-  files?: string[];
-      - postgres
     environment:
-      - DATABASE_URL=postgresql://tguser:tgpass@postgres:5432/tgstorage
+      - DATABASE_URL=file:/app/backend/prisma/db.sqlite
       - TELEGRAM_API_ID=...
       - TELEGRAM_API_HASH=...
       - TELEGRAM_CHANNEL_IDS=[...]
@@ -416,18 +399,18 @@ services:
       - ./backend/data:/app/data
       - ./watch_dir:/app/watch_dir
     ports:
-      - "4000:4000"
+      - '4000:4000'
 
   frontend:
     build: ./frontend
     container_name: tgstore_frontend
     ports:
-      - "3000:3000"
+      - '3000:3000'
     depends_on:
       - backend
 
 volumes:
-  pgdata:
+  sqlite_data:
 ```
 
 Пример структуры проекта

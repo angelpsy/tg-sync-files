@@ -10,7 +10,7 @@
   - [x] `/frontend` — Next.js приложение + API Routes (BFF для REST)
   - [x] `/docs` — документация (уже есть)
   - [x] `/.env.example` — пример переменных окружения
-  - [x] `/docker-compose.yml` — для PostgreSQL, backend WebSocket, frontend BFF
+  - [x] `/docker-compose.yml` — для SQLite, backend WebSocket, frontend BFF
   - [x] Next.js App Router структура инициализирована
   - [x] Tailwind CSS v4 настроен
   - [x] TypeScript конфигурация для frontend
@@ -28,7 +28,7 @@
 ## 1.2. Настройка окружения и переменных
 
 - [x] Создать `.env.example` с переменными:
-  - [x] `DATABASE_URL` — строка подключения к PostgreSQL
+  - [x] `DATABASE_URL` — строка подключения к SQLite
   - [x] `TELEGRAM_API_ID` — API ID из my.telegram.org
   - [x] `TELEGRAM_API_HASH` — API Hash из my.telegram.org
   - [x] `TELEGRAM_CHANNEL_IDS` — JSON массив ID каналов
@@ -47,7 +47,7 @@
 ## 1.3. Docker и контейнеризация
 
 - [x] Написать `docker-compose.yml` с сервисами:
-  - [x] PostgreSQL (версия 15, переменные окружения, volume для данных)
+  - [x] SQLite (файл БД и volume для данных)
   - [x] Backend WebSocket (Node.js, Dockerfile, отдельный процесс на порту 4000)
   - [x] Frontend + BFF (Next.js, Dockerfile, REST API Routes на порту 3000)
   - [x] Использовать default bridge сеть и прямой маппинг портов 3000, 4000 (без

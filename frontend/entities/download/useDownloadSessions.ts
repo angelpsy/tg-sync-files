@@ -4,6 +4,7 @@ import type {
   IDownloadProgress,
   IDownloadSession,
 } from '@/types/file-sync';
+import { WSEvent } from '@/types/websocket/events';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { emit, on } from '@/shared/api/ws/events';
@@ -19,7 +20,7 @@ export function useDownloadSessions() {
 
   useEffect(() => {
     // Snapshot
-    const offSnap = on('download_sessions_snapshot', payload => {
+    const offSnap = on(WSEvent.DOWNLOAD_SESSIONS_SNAPSHOT, payload => {
       const nextById = new Map<string, IDownloadSession>();
       const nextByTopic = new Map<string, string[]>();
       for (const s of payload.sessions || []) {
@@ -32,7 +33,7 @@ export function useDownloadSessions() {
     });
 
     // Live events (best effort)
-    const offStart = on('download_start', ev => {
+    const offStart = on(WSEvent.DOWNLOAD_START, ev => {
       setState(prev => {
         const byId = new Map(prev.byId);
         const byTopic = new Map(prev.byTopic);
@@ -58,7 +59,7 @@ export function useDownloadSessions() {
       });
     });
 
-    const offProg = on('download_progress', ev => {
+    const offProg = on(WSEvent.DOWNLOAD_PROGRESS, ev => {
       lastProgress.current.set(ev.downloadId, ev);
       setState(prev => {
         const byId = new Map(prev.byId);
@@ -78,7 +79,7 @@ export function useDownloadSessions() {
       });
     });
 
-    const offDone = on('download_complete', (ev: IDownloadCompleteEvent) => {
+    const offDone = on(WSEvent.DOWNLOAD_COMPLETE, (ev: IDownloadCompleteEvent) => {
       setState(prev => {
         const byId = new Map(prev.byId);
         const s = byId.get(ev.downloadId);
@@ -96,12 +97,12 @@ export function useDownloadSessions() {
       });
     });
 
-    const offErr = on('download_error', () => {
+    const offErr = on(WSEvent.DOWNLOAD_ERROR, () => {
       // Snapshot will reflect final state; keep minimal here
     });
 
     // Request initial snapshot on mount
-    emit('request_download_sessions', {});
+    emit(WSEvent.REQUEST_DOWNLOAD_SESSIONS, {});
 
     return () => {
       offSnap();

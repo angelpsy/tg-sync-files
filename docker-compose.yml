@@ -1,22 +1,4 @@
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: tg-sync-postgres
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-tg_sync_files}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # Backend WebSocket Server
   backend:
     build:
@@ -26,22 +8,16 @@ services:
     ports:
       - "${BACKEND_WS_PORT}:${BACKEND_WS_PORT}"
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_HOST=${POSTGRES_HOST_DOCKER}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_DB=${POSTGRES_DB:-tg_sync_files}
       - TELEGRAM_API_ID=${TELEGRAM_API_ID}
       - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
       - TELEGRAM_CHANNEL_IDS=${TELEGRAM_CHANNEL_IDS}
       - WATCH_DIR=${WATCH_DIR}
       - BACKEND_WS_PORT=${BACKEND_WS_PORT}
       - CORS_ORIGINS=${CORS_ORIGINS}
+      - DATABASE_URL=file:/app/backend/prisma/db.sqlite
     volumes:
       - ${WATCH_DIR}:/app/watch-dir:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
+      - backend_data:/app/backend/prisma
     restart: unless-stopped
 
   # Frontend Next.js BFF
@@ -62,5 +38,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  backend_data:
     driver: local

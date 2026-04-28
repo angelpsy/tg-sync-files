@@ -135,4 +135,9 @@ export interface ISchedulerService {
    * Cancels task by id
    */
   cancelTask(taskId: string): boolean;
+
+  /**
+   * Gets debug info for all tasks
+   */
+  getTasksInfo(): Record<string, unknown>;
 }

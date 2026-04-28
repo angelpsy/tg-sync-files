@@ -1,5 +1,6 @@
 'use client';
 import type { ITelegramChannel } from '@/types/telegram/models';
+import { WSEvent } from '@/types/websocket/events';
 import { useEffect, useMemo, useState } from 'react';
 
 import { emit, on } from '@/shared/api/ws/events';
@@ -8,10 +9,10 @@ export function useChannels() {
   const [channels, setChannels] = useState<ITelegramChannel[]>([]);
 
   useEffect(() => {
-    const off = on('channels_snapshot', payload => {
+    const off = on(WSEvent.CHANNELS_SNAPSHOT, payload => {
       setChannels(Array.isArray(payload) ? payload : []);
     });
-    emit('request_channels', {});
+    emit(WSEvent.REQUEST_CHANNELS, {});
     return () => off();
   }, []);
 

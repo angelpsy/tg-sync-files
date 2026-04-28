@@ -26,7 +26,7 @@ COPY backend/ ./backend/
 
 # Generate Prisma client
 WORKDIR /app/backend
-RUN pnpm prisma:generate
+RUN pnpm prisma:sqlite:generate
 
 # Build TypeScript
 RUN pnpm build
@@ -35,4 +35,4 @@ RUN pnpm build
 EXPOSE 4000
 
 # Start WebSocket server
-CMD ["pnpm", "start:ws"]
+CMD ["sh", "-c", "pnpm prisma:sqlite:sync && pnpm start:ws"]

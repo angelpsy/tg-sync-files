@@ -1,8 +1,7 @@
 // External / shared
-import { serviceLoggers } from '../../../../shared/logger';
-
+import { serviceLoggers } from '../../../../shared/logger.mts';
 // Types
-import type { IFSService, ISchedulerService, IStorageService } from '@/types';
+import type { IFSService, ISchedulerService, IStorageService } from '../../../../types/index.js';
 
 /**
  * Scheduled task information

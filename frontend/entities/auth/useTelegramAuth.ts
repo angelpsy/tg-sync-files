@@ -1,5 +1,6 @@
 'use client';
 import type { ITelegramUserMinimal } from '@/types';
+import { WSEvent } from '@/types/websocket/events';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { emit, on } from '@/shared/api/ws/events';
@@ -15,26 +16,26 @@ export function useTelegramAuth() {
 
   useEffect(() => {
     const offs = [
-      on('auth_pending_code', p => {
+      on(WSEvent.AUTH_PENDING_CODE, p => {
         setStep('pending_code');
         setMaskedPhone(p?.maskedPhone);
         setError(undefined);
       }),
-      on('auth_pending_password', p => {
+      on(WSEvent.AUTH_PENDING_PASSWORD, p => {
         setStep('pending_password');
         setMaskedPhone(p?.maskedPhone);
         setError(undefined);
       }),
-      on('auth_success', p => {
+      on(WSEvent.AUTH_SUCCESS, p => {
         setStep('success');
         setMaskedPhone(p?.maskedPhone);
         setError(undefined);
       }),
-      on('auth_error', p => {
+      on(WSEvent.AUTH_ERROR, p => {
         setStep('error');
         setError(p?.message || 'Authentication error');
       }),
-      on('auth_state', s => {
+      on(WSEvent.AUTH_STATE, s => {
         if (s?.isAuthenticated) {
           setStep('success');
           setUser(s.user);
@@ -47,26 +48,31 @@ export function useTelegramAuth() {
   }, []);
 
   const start = useCallback((phone: string) => {
-    emit('auth_init', { phone });
+    emit(WSEvent.AUTH_INIT, { phone });
   }, []);
   const submitCode = useCallback((code: string) => {
-    emit('auth_code', { code });
+    emit(WSEvent.AUTH_CODE, { code });
   }, []);
   const submitPassword = useCallback((password: string) => {
-    emit('auth_password', { password });
+    emit(WSEvent.AUTH_PASSWORD, { password });
   }, []);
 
   const logout = useCallback(() => {
-    emit('auth_logout', {} as never);
+    emit(WSEvent.AUTH_LOGOUT, {} as never);
+  }, []);
+
+  const reset = useCallback(() => {
+    setStep('idle');
+    setError(undefined);
   }, []);
 
   // Ask server for current auth state on mount
   useEffect(() => {
-    emit('request_auth_state', {} as never);
+    emit(WSEvent.REQUEST_AUTH_STATE, {} as never);
   }, []);
 
   return useMemo(
-    () => ({ step, maskedPhone, error, user, start, submitCode, submitPassword, logout }),
-    [step, maskedPhone, error, user, start, submitCode, submitPassword, logout]
+    () => ({ step, maskedPhone, error, user, start, submitCode, submitPassword, logout, reset }),
+    [step, maskedPhone, error, user, start, submitCode, submitPassword, logout, reset]
   );
 }

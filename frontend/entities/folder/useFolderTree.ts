@@ -1,4 +1,5 @@
 'use client';
+import { WSEvent } from '@/types/websocket/events';
 import { useEffect, useRef, useState } from 'react';
 
 import type { IFolderTree } from './types';
@@ -14,7 +15,7 @@ export function useFolderTree() {
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const off = on('folder_tree_update', payload => {
+    const off = on(WSEvent.FOLDER_TREE_UPDATE, payload => {
       const data = payload as unknown;
       if (Array.isArray(data)) {
         const arr = data as IFolderTree[];

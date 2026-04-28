@@ -1,6 +1,6 @@
 import type { Socket } from 'socket.io';
 
-import { serviceLoggers } from '../../../../shared/logger';
+import { serviceLoggers } from '../../../../shared/logger.mts';
 
 /**
  * Типы ошибок WebSocket

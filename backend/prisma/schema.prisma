@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -117,7 +117,7 @@ model DownloadSession {
 // Telegram session data
 model TelegramSession {
   id            String   @id @default(cuid())
-  stringSession String   @db.Text
+  stringSession String
   phoneNumber   String
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
@@ -151,7 +151,7 @@ model FileRecord {
   fileName   String
   size       Int
   mtimeMs    BigInt
-  hash       String?  @db.Text
+  hash       String?
   uploadedAt DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

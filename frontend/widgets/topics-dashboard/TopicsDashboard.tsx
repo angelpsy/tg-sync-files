@@ -17,7 +17,7 @@ export function TopicsDashboard() {
   const { topics } = useTopics(selectedChannelId);
   const { statuses } = useChannelStatuses();
   const [expandedTopicId, setExpandedTopicId] = useState<string | undefined>(undefined);
-  const { records, originalFolders } = useTopicFiles(expandedTopicId);
+  const { records, originalFolders } = useTopicFiles(expandedTopicId, selectedChannelId);
   const { files } = useTopicFilesList(expandedTopicId, selectedChannelId);
 
   const list = useMemo(() => topics, [topics]);

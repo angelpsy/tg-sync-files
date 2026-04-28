@@ -3,14 +3,11 @@ import type { AddressInfo } from 'node:net';
 
 import { Server as IOServer, type Socket } from 'socket.io';
 
-import { serviceLoggers } from '../../../../shared/logger';
-
-import type { ISocketService, IWSConnectionInfo, IWSMessage } from '@/types';
-import {
-  WS_PROTOCOL_VERSION,
-  type EventPayloadMap,
-  type TEventName,
-} from '@/types/websocket/events.js';
+import { serviceLoggers } from '../../../../shared/logger.mts';
+import type { ISocketService, IWSConnectionInfo, IWSMessage } from '../../../../types/index.js';
+import type { EventPayloadMap, TEventName } from '../../../../types/websocket/events.js';
+import * as WSEvents from '../../../../types/websocket/events.js';
+const { WS_PROTOCOL_VERSION } = WSEvents;
 
 interface SocketServiceOptions {
   port: number; // if 0 use random free port (main HTTP server not yet integrated)

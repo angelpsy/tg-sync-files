@@ -39,6 +39,7 @@ export class TelegramService implements ITelegramService {
   private logger = serviceLoggers.telegram;
   private retryManager: RetryManager;
   private channelCache: ITelegramChannel[] | null = null;
+  private readonly configuredChannelIds?: string[];
   // Stepwise auth state
   private authPhone?: string;
   private phoneCodeHash?: string;
@@ -48,8 +49,10 @@ export class TelegramService implements ITelegramService {
     private storageService: IStorageService,
     private apiId: number,
     private apiHash: string,
+    configuredChannelIds?: string[],
     private retryConfig: RetryConfig = RETRY_CONFIGS.telegram
   ) {
+    this.configuredChannelIds = configuredChannelIds?.map(id => id.trim()).filter(Boolean);
     this.retryManager = new RetryManager(this.retryConfig);
   }
 
@@ -264,6 +267,13 @@ export class TelegramService implements ITelegramService {
     const client = this.getClient();
     return this.executeWithRetry('getChannels', async () => {
       this.logger.info('Fetching user channels...');
+
+      if (Array.isArray(this.configuredChannelIds) && this.configuredChannelIds.length > 0) {
+        const channels = await this.resolveConfiguredChannels(client, this.configuredChannelIds);
+        this.channelCache = channels;
+        return channels;
+      }
+
       const result = await client.invoke(
         new Api.messages.GetDialogs({
           offsetDate: 0,
@@ -302,6 +312,50 @@ export class TelegramService implements ITelegramService {
       this.channelCache = channels; // cache
       return channels;
     });
+  }
+
+  private mapEntityToChannel(entity: Api.Channel | Api.Chat): ITelegramChannel {
+    return {
+      id: entity.id.toString(),
+      title: entity.title,
+      name: entity.title,
+      username: 'username' in entity ? entity.username || undefined : undefined,
+      accessHash: 'accessHash' in entity ? entity.accessHash?.toString() : undefined,
+      isGroup: entity instanceof Api.Chat,
+      isForum: 'forum' in entity ? !!entity.forum : false,
+      participantsCount:
+        'participantsCount' in entity && typeof entity.participantsCount === 'number'
+          ? entity.participantsCount
+          : 0,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  private async resolveConfiguredChannels(
+    client: TelegramClient,
+    configuredIds: string[]
+  ): Promise<ITelegramChannel[]> {
+    type DialogProvider = {
+      getEntity: (peer: string) => Promise<unknown>;
+    };
+    const provider = client as unknown as DialogProvider;
+
+    const resolved: ITelegramChannel[] = [];
+    for (const configuredId of configuredIds) {
+      try {
+        const entity = await provider.getEntity(configuredId);
+        if (!(entity instanceof Api.Channel || entity instanceof Api.Chat)) continue;
+
+        const mapped = this.mapEntityToChannel(entity);
+        resolved.push(mapped);
+      } catch {
+        // Skip channels inaccessible for current account/session.
+      }
+    }
+
+    return resolved;
   }
 
   /** Fetch topics for a given channel */

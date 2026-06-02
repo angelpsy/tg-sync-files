@@ -60,7 +60,8 @@ export class ServiceContainer {
       this.telegramService = new TelegramService(
         this.storage,
         this.config.telegramApiId,
-        this.config.telegramApiHash
+        this.config.telegramApiHash,
+        this.config.channelIds
       );
       try {
         await this.telegramService.initialize();

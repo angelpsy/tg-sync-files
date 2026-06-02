@@ -8,13 +8,12 @@ import { on } from '@/shared/api/ws/events';
 /**
  * useChannelStatuses — subscribes to channel_status_update events
  */
-export function useChannelStatuses() {
+export function useChannelStatusesQuery() {
   const [statuses, setStatuses] = useState<Record<string, IChannelStatus>>({});
 
   useEffect(() => {
-    const off = on(WSEvent.CHANNEL_STATUS_UPDATE, payload => {
-      const st = payload as IChannelStatus;
-      setStatuses(prev => ({ ...prev, [st.channelId]: st }));
+    const off = on(WSEvent.CHANNEL_STATUS_UPDATE, status => {
+      setStatuses(prev => ({ ...prev, [status.channelId]: status }));
     });
     return () => off();
   }, []);

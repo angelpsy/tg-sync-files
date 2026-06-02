@@ -12,7 +12,7 @@ export interface DownloadOptions {
   overwriteExisting?: boolean;
 }
 
-export function useDownload() {
+export function useDownloadCommand() {
   const startDownload = useCallback((options: DownloadOptions) => {
     emit(WSEvent.START_TOPIC_DOWNLOAD, {
       topicId: options.topicId,

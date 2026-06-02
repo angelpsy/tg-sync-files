@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useTelegramAuth } from '@/entities/auth/useTelegramAuth';
+import { useTelegramAuthQuery } from '@/entities/auth';
 
 export function AuthPanel() {
   const { step, maskedPhone, error, user, start, submitCode, submitPassword, logout, reset } =
-    useTelegramAuth();
+    useTelegramAuthQuery();
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');

@@ -1,3 +1,3 @@
-export { useDownload } from './useDownload';
-export type { DownloadOptions } from './useDownload';
-export { useDownloadSessions } from './useDownloadSessions';
+export { useDownloadCommand } from './commands/useDownloadCommand';
+export type { DownloadOptions } from './commands/useDownloadCommand';
+export { useDownloadSessionsQuery } from './queries/useDownloadSessionsQuery';

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { emit, on } from '@/shared/api/ws/events';
 
-export function useChannels() {
+export function useChannelsQuery() {
   const [channels, setChannels] = useState<ITelegramChannel[]>([]);
 
   useEffect(() => {

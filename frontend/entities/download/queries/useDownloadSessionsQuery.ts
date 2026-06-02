@@ -4,6 +4,7 @@ import type {
   IDownloadProgress,
   IDownloadSession,
 } from '@/types/file-sync';
+import { EOperationStatus } from '@/types/file-sync/enums';
 import { WSEvent } from '@/types/websocket/events';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -14,7 +15,7 @@ type SessionsState = {
   byTopic: Map<string, string[]>; // topicId -> [sessionIds]
 };
 
-export function useDownloadSessions() {
+export function useDownloadSessionsQuery() {
   const [state, setState] = useState<SessionsState>({ byId: new Map(), byTopic: new Map() });
   const lastProgress = useRef<Map<string, IDownloadProgress>>(new Map());
 
@@ -42,7 +43,7 @@ export function useDownloadSessions() {
           topicId: ev.topicId,
           channelId: ev.channelId,
           targetPath: ev.targetPath,
-          status: 'in_progress',
+          status: EOperationStatus.IN_PROGRESS,
           totalFiles: ev.totalFiles,
           downloadedFiles: 0,
           currentFile: '',
@@ -50,7 +51,7 @@ export function useDownloadSessions() {
           startedAt: new Date(),
           updatedAt: new Date(),
           selectedFiles: ev.selectedFiles || [],
-        } as IDownloadSession;
+        };
         byId.set(s.id, s);
         const arr = byTopic.get(s.topicId) || [];
         if (!arr.includes(s.id)) arr.push(s.id);
@@ -73,7 +74,7 @@ export function useDownloadSessions() {
             currentFile: ev.fileName,
             progress,
             updatedAt: new Date(),
-          } as IDownloadSession);
+          });
         }
         return { ...prev, byId };
       });
@@ -86,12 +87,12 @@ export function useDownloadSessions() {
         if (s) {
           byId.set(ev.downloadId, {
             ...s,
-            status: ev.hasFailures ? 'partial' : 'completed',
+            status: ev.hasFailures ? EOperationStatus.PARTIAL : EOperationStatus.COMPLETED,
             downloadedFiles: ev.downloadedFiles,
             progress: 100,
             updatedAt: new Date(),
             completedAt: new Date(),
-          } as IDownloadSession);
+          });
         }
         return { ...prev, byId };
       });

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { emit, on } from '@/shared/api/ws/events';
 
-export function useTopicFiles(topicId?: string, channelId?: string, refreshMs = 30000) {
+export function useTopicFilesQuery(topicId?: string, channelId?: string, refreshMs = 30000) {
   const [records, setRecords] = useState<IFileRecord[]>([]);
   const [originalFolders, setOriginalFolders] = useState<string[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);

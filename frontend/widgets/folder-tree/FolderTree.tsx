@@ -1,42 +1,30 @@
 'use client';
-import { WSEvent } from '@/types/websocket/events';
-import {
-  ChevronDown,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  File as FileIcon,
-  Folder as FolderIcon,
-} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useChannels } from '@/entities/channel/useChannels';
+import { useChannelsQuery, usePersistedChannelSelectionQuery } from '@/entities/channel';
 import type { IFolderTree } from '@/entities/folder/types';
-import { useFolderTree } from '@/entities/folder/useFolderTree';
-import { useTopics } from '@/entities/topic/useTopics';
-import { useUploadSessions } from '@/entities/upload/useUploadSessions';
-import { emit } from '@/shared/api/ws/events';
+import { useFolderTreeQuery } from '@/entities/folder';
+import { useTopicsQuery } from '@/entities/topic';
+import { startFolderUpload, useUploadSessionsQuery } from '@/entities/upload';
+
+import { TreeNode, TreeToolbar } from './components';
 
 /**
  * FolderTree widget – renders current scanned folder tree snapshot from WS events.
- * Input: none (uses WS-subscription hook). Output: visual tree. Empty/null handled.
  */
 export function FolderTree() {
-  const { tree, changedPaths } = useFolderTree();
-  const { channels, single } = useChannels();
+  const { tree, changedPaths } = useFolderTreeQuery();
+  const { channels, single } = useChannelsQuery();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [hiddenFiles, setHiddenFiles] = useState<Set<string>>(new Set());
-  const [selectedChannelId, setSelectedChannelId] = useState<string | undefined>(single?.id);
-  const { topics } = useTopics(selectedChannelId);
-  const { getByFolder, pause, resume, cancel } = useUploadSessions();
+  const { selectedChannelId, setSelectedChannelId } = usePersistedChannelSelectionQuery(
+    channels,
+    single
+  );
+  const { topics } = useTopicsQuery(selectedChannelId);
+  const { getByFolder, pause, resume, cancel } = useUploadSessionsQuery();
 
-  useEffect(() => {
-    if (single?.id) setSelectedChannelId(single.id);
-  }, [single?.id]);
-
-  // Ensure root is expanded when first tree arrives
   useEffect(() => {
     if (!tree) return;
     setExpanded(prev => {
@@ -47,7 +35,7 @@ export function FolderTree() {
     });
   }, [tree]);
 
-  const onToggle = (path: string) => {
+  const toggleNode = (path: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path);
@@ -58,14 +46,15 @@ export function FolderTree() {
 
   const expandAll = () => {
     if (!tree) return;
-    const all = collectFolderPaths(tree);
-    setExpanded(new Set(all));
+    setExpanded(new Set(collectFolderPaths(tree)));
   };
 
   const collapseAll = () => {
-    if (!tree) return setExpanded(new Set());
-    const rootOnly = new Set<string>([tree.path]);
-    setExpanded(rootOnly);
+    if (!tree) {
+      setExpanded(new Set());
+      return;
+    }
+    setExpanded(new Set<string>([tree.path]));
   };
 
   const toggleHideFiles = (path: string) => {
@@ -80,34 +69,35 @@ export function FolderTree() {
   const hideFilesForExpanded = (hide: boolean) => {
     setHiddenFiles(prev => {
       const next = new Set(prev);
-      expanded.forEach(p => {
-        if (hide) next.add(p);
-        else next.delete(p);
+      expanded.forEach(path => {
+        if (hide) next.add(path);
+        else next.delete(path);
       });
       return next;
     });
   };
 
   const content = useMemo(() => {
-    if (!tree)
+    if (!tree) {
       return (
-        <div className="text-sm text-muted-foreground">
-          No data yet. Waiting for folder_tree_update…
-        </div>
+        <div className="text-sm text-muted-foreground">No data yet. Waiting for folder_tree_update…</div>
       );
+    }
+
     return (
       <div className="space-y-1">
         <TreeNode
           node={tree}
           depth={0}
           expanded={expanded}
-          onToggle={onToggle}
           changedPaths={changedPaths}
           hiddenFiles={hiddenFiles}
-          onToggleHideFiles={toggleHideFiles}
           selectedChannelId={selectedChannelId}
           topics={topics}
           getByFolder={getByFolder}
+          onToggle={toggleNode}
+          onToggleHideFiles={toggleHideFiles}
+          onStartUpload={startFolderUpload}
           onPause={pause}
           onResume={resume}
           onCancel={cancel}
@@ -128,389 +118,32 @@ export function FolderTree() {
   ]);
 
   return (
-    <Card>
+    <Card className="h-[calc(50vh-5.5rem)] min-h-[260px] flex flex-col">
       <CardHeader className="py-3 flex flex-row items-center justify-between gap-4">
         <CardTitle className="text-base flex-shrink-0">Folder Tree</CardTitle>
-        <div className="flex flex-wrap gap-2 justify-end">
-          <select
-            className="border rounded px-2 py-1 bg-background text-foreground disabled:opacity-60 text-sm"
-            value={selectedChannelId || single?.id || ''}
-            onChange={e => setSelectedChannelId(e.target.value)}
-            disabled={!!single}
-          >
-            {(single ? [single] : channels).map(c => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-          </select>
-          <Button size="sm" variant="secondary" onClick={expandAll} disabled={!tree}>
-            Expand all
-          </Button>
-          <Button size="sm" variant="secondary" onClick={collapseAll} disabled={!tree}>
-            Collapse all
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => hideFilesForExpanded(true)}
-            disabled={!tree}
-          >
-            Hide files
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => hideFilesForExpanded(false)}
-            disabled={!tree}
-          >
-            Show files
-          </Button>
-        </div>
+        <TreeToolbar
+          channels={channels}
+          singleChannel={single}
+          selectedChannelId={selectedChannelId || single?.id || ''}
+          treeLoaded={!!tree}
+          onSelectChannel={setSelectedChannelId}
+          onExpandAll={expandAll}
+          onCollapseAll={collapseAll}
+          onHideFiles={() => hideFilesForExpanded(true)}
+          onShowFiles={() => hideFilesForExpanded(false)}
+        />
       </CardHeader>
-      <CardContent className="max-h-[500px] overflow-auto text-sm">{content}</CardContent>
+      <CardContent className="overflow-auto text-sm">{content}</CardContent>
     </Card>
   );
 }
 
-function TreeNode({
-  node,
-  depth,
-  expanded,
-  onToggle,
-  changedPaths,
-  hiddenFiles,
-  onToggleHideFiles,
-  selectedChannelId,
-  topics,
-  getByFolder,
-  onPause,
-  onResume,
-  onCancel,
-}: {
-  node: IFolderTree;
-  depth: number;
-  expanded: Set<string>;
-  onToggle: (path: string) => void;
-  changedPaths: Set<string>;
-  hiddenFiles: Set<string>;
-  onToggleHideFiles: (path: string) => void;
-  selectedChannelId?: string;
-  topics: Array<{ id: string; title?: string; name?: string }>;
-  getByFolder: (folderPath: string) => any;
-  onPause: (id: string) => void;
-  onResume: (id: string) => void;
-  onCancel: (id: string) => void;
-}) {
-  const isFolder = node.type === 'folder';
-  const isOpen = isFolder && expanded.has(node.path);
-  const isChanged = changedPaths.has(node.path);
-  const filesHiddenHere = hiddenFiles.has(node.path);
-
-  return (
-    <div>
-      <div
-        className={`flex items-center gap-2 py-0.5 ${isChanged ? 'bg-amber-100/40 dark:bg-amber-900/20 rounded px-1' : ''}`}
-      >
-        <div style={{ width: depth * 16 }} className="flex-shrink-0" />
-        {isFolder ? (
-          <button
-            type="button"
-            onClick={() => onToggle(node.path)}
-            className="inline-flex items-center justify-center size-5 rounded hover:bg-accent text-muted-foreground mr-1"
-          >
-            {isOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-          </button>
-        ) : (
-          <div className="size-5 mr-1" />
-        )}
-
-        {isFolder ? (
-          <FolderIcon className="size-4 text-yellow-600 flex-shrink-0" />
-        ) : (
-          <FileIcon className="size-4 text-blue-600 flex-shrink-0" />
-        )}
-
-        <span className="font-medium truncate max-w-[300px]" title={node.path}>
-          {node.name}
-        </span>
-
-        {typeof node.size === 'number' && !isFolder && (
-          <span className="ml-auto text-muted-foreground text-xs">{formatBytes(node.size)}</span>
-        )}
-        {isFolder && (
-          <span className="ml-auto text-muted-foreground flex items-center gap-2">
-            <span className="text-xs">{node.fileCount} items</span>
-            {isChanged && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200/70 text-amber-900 dark:bg-amber-800/60 dark:text-amber-100 font-bold uppercase">
-                updated
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => onToggleHideFiles(node.path)}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-accent text-muted-foreground border border-border"
-              title={filesHiddenHere ? 'Show files' : 'Hide files'}
-            >
-              {filesHiddenHere ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
-              <span className="text-[10px] hidden sm:inline">
-                {filesHiddenHere ? 'Show' : 'Hide'}
-              </span>
-            </button>
-          </span>
-        )}
-      </div>
-
-      {isFolder && isOpen && (
-        <div className="ml-2 pl-3 border-l border-border/50">
-          <FolderUploadControls
-            folderPath={node.path}
-            directFiles={(node.children || []).filter(c => c.type === 'file').map(f => f.name)}
-            selectedChannelId={selectedChannelId}
-            topics={topics}
-            activeSession={getByFolder(node.path)}
-            onPause={onPause}
-            onResume={onResume}
-            onCancel={onCancel}
-          />
-          {node.children?.length
-            ? node.children
-                .filter(c => !(filesHiddenHere && c.type === 'file'))
-                .map((child, idx) => (
-                  <TreeNode
-                    key={`${child.path}-${idx}`}
-                    node={child}
-                    depth={depth + 1}
-                    expanded={expanded}
-                    onToggle={onToggle}
-                    changedPaths={changedPaths}
-                    hiddenFiles={hiddenFiles}
-                    onToggleHideFiles={onToggleHideFiles}
-                    selectedChannelId={selectedChannelId}
-                    topics={topics}
-                    getByFolder={getByFolder}
-                    onPause={onPause}
-                    onResume={onResume}
-                    onCancel={onCancel}
-                  />
-                ))
-            : null}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FolderUploadControls({
-  folderPath,
-  directFiles,
-  selectedChannelId,
-  topics,
-  activeSession,
-  onPause,
-  onResume,
-  onCancel,
-}: {
-  folderPath: string;
-  directFiles: string[];
-  selectedChannelId?: string;
-  topics: Array<{ id: string; title?: string; name?: string }>;
-  activeSession?: {
-    id: string;
-    folderPath: string;
-    topicId: string;
-    status: string;
-    totalFiles: number;
-    uploadedFiles: number;
-    progress: number;
-  };
-  onPause: (id: string) => void;
-  onResume: (id: string) => void;
-  onCancel: (id: string) => void;
-}) {
-  const [topicChoice, setTopicChoice] = useState<string>('__new__');
-  const [newTopicName, setNewTopicName] = useState<string>(folderPath.split('/').pop() || 'New');
-  const [useAllFiles, setUseAllFiles] = useState<boolean>(true);
-  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
-
-  const canStart =
-    !!selectedChannelId && (topicChoice !== '__new__' || newTopicName.trim().length > 0);
-  const topicOptions = useMemo(
-    () => [{ id: '__new__', title: '— New topic —' }, ...topics],
-    [topics]
-  );
-
-  const onToggleFile = (name: string) => {
-    setSelectedFiles(prev => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  };
-
-  const startUpload = () => {
-    if (!selectedChannelId) return;
-    const channelId = selectedChannelId;
-    const base = { folderPath, channelId } as const;
-    const topicPart =
-      topicChoice === '__new__'
-        ? { newTopicName: newTopicName.trim() }
-        : { existingTopicId: topicChoice };
-    const filesPart = useAllFiles ? {} : { selectedFiles: Array.from(selectedFiles) };
-    emit(WSEvent.START_FOLDER_UPLOAD, { ...base, ...topicPart, ...filesPart });
-  };
-
-  return (
-    <div className="my-3 p-3 border rounded-lg bg-muted/20 shadow-sm border-dashed border-muted-foreground/30">
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="inline-flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">
-            Topic
-          </span>
-          <select
-            className="border rounded px-2 py-1 bg-background text-foreground text-xs focus:ring-1 focus:ring-primary min-w-[140px]"
-            value={topicChoice}
-            onChange={e => setTopicChoice(e.target.value)}
-          >
-            {topicOptions.map(t => (
-              <option key={t.id} value={t.id}>
-                {t.title || t.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {topicChoice === '__new__' && (
-          <input
-            type="text"
-            className="border rounded px-2 py-1 bg-background text-foreground min-w-[160px] text-xs focus:ring-1 focus:ring-primary"
-            placeholder="New topic name"
-            value={newTopicName}
-            onChange={e => setNewTopicName(e.target.value)}
-          />
-        )}
-
-        <div className="flex items-center gap-4 border-l pl-3 ml-1">
-          <label className="inline-flex items-center gap-2 text-xs cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="size-3 rounded-sm border-primary text-primary focus:ring-primary"
-              checked={useAllFiles}
-              onChange={e => setUseAllFiles(e.target.checked)}
-            />
-            <span className="font-semibold">All files</span>
-          </label>
-
-          <Button
-            size="sm"
-            variant="default"
-            className="shadow-sm h-7 text-xs px-4"
-            disabled={!canStart || activeSession?.status === 'uploading'}
-            onClick={startUpload}
-          >
-            {activeSession?.status === 'uploading' ? 'Uploading...' : 'Start'}
-          </Button>
-        </div>
-
-        {activeSession && (
-          <div className="ml-auto flex items-center gap-3 bg-background/50 rounded-md px-3 py-1 border shadow-xs border-primary/20">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black uppercase text-primary/60 tracking-wider">
-                Progress
-              </span>
-              <span className="text-xs font-mono font-bold text-primary tabular-nums">
-                {activeSession.uploadedFiles}/{activeSession.totalFiles} • {activeSession.progress}%
-              </span>
-            </div>
-
-            <div className="flex gap-1 border-l pl-2">
-              {activeSession.status === 'uploading' ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-2 text-[10px] font-black text-amber-600 hover:text-amber-700 hover:bg-amber-100"
-                  onClick={() => onPause(activeSession.id)}
-                >
-                  PAUSE
-                </Button>
-              ) : activeSession.status === 'paused' ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-2 text-[10px] font-black text-green-600 hover:text-green-700 hover:bg-green-100"
-                  onClick={() => onResume(activeSession.id)}
-                >
-                  RESUME
-                </Button>
-              ) : null}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 px-2 text-[10px] font-black text-red-600 hover:text-red-700 hover:bg-red-100"
-                onClick={() => onCancel(activeSession.id)}
-              >
-                STOP
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {!useAllFiles && (
-        <div className="mt-3 bg-background/40 rounded-md p-2 border border-dashed animate-in fade-in slide-in-from-top-1">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">
-              Select specific files:
-            </span>
-            <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-bold">
-              {selectedFiles.size} selected
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {directFiles.length === 0 ? (
-              <span className="text-[10px] text-muted-foreground italic pl-1">
-                No direct files in this folder
-              </span>
-            ) : (
-              directFiles.map(f => (
-                <label
-                  key={f}
-                  className={`inline-flex items-center gap-1.5 text-[11px] border rounded-full px-3 py-0.5 cursor-pointer transition-all ${selectedFiles.has(f) ? 'bg-primary/10 border-primary/50 text-primary font-bold shadow-sm' : 'hover:bg-muted font-medium border-muted-foreground/30'}`}
-                >
-                  <input
-                    type="checkbox"
-                    className="size-3 rounded-full border-primary/50 text-primary"
-                    checked={selectedFiles.has(f)}
-                    onChange={() => onToggleFile(f)}
-                  />
-                  <span className="truncate max-w-[200px]" title={f}>
-                    {f}
-                  </span>
-                </label>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-}
-
 function collectFolderPaths(root: IFolderTree): string[] {
   const out: string[] = [];
-  const walk = (n: IFolderTree) => {
-    if (n.type === 'folder') {
-      out.push(n.path);
-      n.children?.forEach(walk);
+  const walk = (node: IFolderTree) => {
+    if (node.type === 'folder') {
+      out.push(node.path);
+      node.children?.forEach(walk);
     }
   };
   walk(root);

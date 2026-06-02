@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useDownload } from '@/entities/download';
+import { useDownloadCommand } from '@/entities/download';
 
 interface FileDownloadWidgetProps {
   topicId: string;
@@ -23,7 +23,7 @@ export function FileDownloadWidget({
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [targetPath, setTargetPath] = useState('/Users/Downloads/telegram-files');
   const [isLoading, setIsLoading] = useState(false);
-  const { startDownload } = useDownload();
+  const { startDownload } = useDownloadCommand();
 
   const handleSelectAll = () => {
     if (selectedFiles.length === files.length) {

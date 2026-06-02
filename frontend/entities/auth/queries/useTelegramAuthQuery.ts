@@ -8,7 +8,7 @@ import { emit, on } from '@/shared/api/ws/events';
 type AuthStep = 'idle' | 'pending_code' | 'pending_password' | 'success' | 'error';
 type User = ITelegramUserMinimal;
 
-export function useTelegramAuth() {
+export function useTelegramAuthQuery() {
   const [step, setStep] = useState<AuthStep>('idle');
   const [maskedPhone, setMaskedPhone] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);

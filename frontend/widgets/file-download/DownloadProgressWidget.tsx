@@ -1,59 +1,26 @@
 'use client';
 
-import type { IDownloadSession } from '@/types/file-sync';
+import {
+  getStatusBadgeClass,
+  getStatusText,
+  isInProgress,
+  isPending,
+} from '@/shared/lib/status/operationStatus';
 
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { useDownloadSessions } from '@/entities/download';
+import { useDownloadSessionsQuery } from '@/entities/download';
 
 interface DownloadProgressWidgetProps {
   className?: string;
 }
 
 export function DownloadProgressWidget({ className }: DownloadProgressWidgetProps) {
-  const { raw } = useDownloadSessions();
+  const { raw } = useDownloadSessionsQuery();
 
   const activeSessions = Array.from(raw.byId.values()).filter(
-    session => session.status === 'in_progress' || session.status === 'pending'
+    session => isInProgress(session.status) || isPending(session.status)
   );
-
-  const getStatusColor = (status: IDownloadSession['status']) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'in_progress':
-        return 'bg-blue-100 text-blue-800';
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      case 'partial':
-        return 'bg-orange-100 text-orange-800';
-      case 'paused':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusText = (status: IDownloadSession['status']) => {
-    switch (status) {
-      case 'pending':
-        return 'Pending';
-      case 'in_progress':
-        return 'Downloading';
-      case 'completed':
-        return 'Completed';
-      case 'failed':
-        return 'Failed';
-      case 'partial':
-        return 'Partially Complete';
-      case 'paused':
-        return 'Paused';
-      default:
-        return 'Unknown';
-    }
-  };
 
   const formatElapsedTime = (startedAt: Date) => {
     const now = new Date();
@@ -85,7 +52,7 @@ export function DownloadProgressWidget({ className }: DownloadProgressWidgetProp
             <div key={session.id} className="border rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Badge className={getStatusColor(session.status)}>
+                  <Badge className={getStatusBadgeClass(session.status)}>
                     {getStatusText(session.status)}
                   </Badge>
                   <span className="text-sm font-medium">Topic: {session.topicId}</span>
@@ -120,16 +87,6 @@ export function DownloadProgressWidget({ className }: DownloadProgressWidgetProp
                   <div>Selected: {session.selectedFiles.length} files</div>
                 )}
               </div>
-
-              {/* TODO: Add pause/resume buttons when backend events are available */}
-              {/* <div className="flex space-x-2 pt-2">
-                <Button size="sm" variant="outline">
-                  {session.status === 'paused' ? 'Resume' : 'Pause'}
-                </Button>
-                <Button size="sm" variant="outline">
-                  Cancel
-                </Button>
-              </div> */}
             </div>
           ))}
         </div>

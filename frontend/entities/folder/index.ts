@@ -1,2 +1,2 @@
 export * from './types';
-export * from './useFolderTree';
+export { useFolderTreeQuery } from './queries/useFolderTreeQuery';

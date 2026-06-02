@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { emit, on } from '@/shared/api/ws/events';
 
-export function useTopicFilesList(topicId?: string, channelId?: string) {
+export function useTopicFilesListQuery(topicId?: string, channelId?: string) {
   const [files, setFiles] = useState<ITopicFileInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 

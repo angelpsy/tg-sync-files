@@ -2,9 +2,10 @@
 import type { IUploadSession } from '@/types/file-sync';
 import { useMemo, useState } from 'react';
 
+import type { TopicOption } from './types';
+
 import { Button } from '@/components/ui/button';
 import { isInProgress, isPaused } from '@/shared/lib/status/operationStatus';
-import type { TopicOption } from './types';
 
 type UploadControlsProps = {
   folderPath: string;
@@ -78,7 +79,9 @@ export function UploadControls({
     <div className="my-3 p-3 border rounded-lg bg-muted/20 shadow-sm border-dashed border-muted-foreground/30">
       <div className="flex flex-wrap items-center gap-3">
         <label className="inline-flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">Topic</span>
+          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">
+            Topic
+          </span>
           <select
             className="border rounded px-2 py-1 bg-background text-foreground text-xs focus:ring-1 focus:ring-primary min-w-[140px]"
             value={topicChoice}
@@ -127,7 +130,9 @@ export function UploadControls({
         {activeSession && (
           <div className="ml-auto flex items-center gap-3 bg-background/50 rounded-md px-3 py-1 border shadow-xs border-primary/20">
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black uppercase text-primary/60 tracking-wider">Progress</span>
+              <span className="text-[10px] font-black uppercase text-primary/60 tracking-wider">
+                Progress
+              </span>
               <span className="text-xs font-mono font-bold text-primary tabular-nums">
                 {activeSession.uploadedFiles}/{activeSession.totalFiles} • {activeSession.progress}%
               </span>
@@ -178,7 +183,9 @@ export function UploadControls({
           </div>
           <div className="flex flex-wrap gap-1.5 pt-1">
             {directFiles.length === 0 ? (
-              <span className="text-[10px] text-muted-foreground italic pl-1">No direct files in this folder</span>
+              <span className="text-[10px] text-muted-foreground italic pl-1">
+                No direct files in this folder
+              </span>
             ) : (
               directFiles.map(fileName => (
                 <label

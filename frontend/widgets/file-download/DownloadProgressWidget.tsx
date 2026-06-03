@@ -1,15 +1,14 @@
 'use client';
 
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { useDownloadSessionsQuery } from '@/entities/download';
 import {
   getStatusBadgeClass,
   getStatusText,
   isInProgress,
   isPending,
 } from '@/shared/lib/status/operationStatus';
-
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
-import { useDownloadSessionsQuery } from '@/entities/download';
 
 interface DownloadProgressWidgetProps {
   className?: string;

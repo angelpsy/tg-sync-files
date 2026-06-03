@@ -1,8 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-
 import type { ITelegramChannel } from '@/types/telegram/models';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 const CHANNEL_STORAGE_KEY = 'tg-sync:selectedChannelId';
 const CHANNEL_EVENT = 'tg-sync:selected-channel-change';
@@ -21,7 +20,9 @@ export function usePersistedChannelSelectionQuery(
     if (typeof window === 'undefined') return;
     if (channelId) window.localStorage.setItem(CHANNEL_STORAGE_KEY, channelId);
     else window.localStorage.removeItem(CHANNEL_STORAGE_KEY);
-    window.dispatchEvent(new CustomEvent<ChannelSelectionPayload>(CHANNEL_EVENT, { detail: { channelId } }));
+    window.dispatchEvent(
+      new CustomEvent<ChannelSelectionPayload>(CHANNEL_EVENT, { detail: { channelId } })
+    );
   }, []);
 
   const setSelectedChannelId = useCallback(

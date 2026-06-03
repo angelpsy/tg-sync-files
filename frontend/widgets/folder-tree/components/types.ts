@@ -1,5 +1,6 @@
-import type { IFolderTree } from '@/entities/folder/types';
 import type { IUploadSession } from '@/types/file-sync';
+
+import type { IFolderTree } from '@/entities/folder/types';
 
 export type TopicOption = { id: string; title?: string; name?: string };
 

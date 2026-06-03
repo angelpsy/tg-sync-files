@@ -1,6 +1,11 @@
 'use client';
+import type {
+  IUploadCompleteEvent,
+  IUploadProgress,
+  IUploadSession,
+  IUploadStartEvent,
+} from '@/types/file-sync';
 import { EUploadStatus } from '@/types/file-sync/enums';
-import type { IUploadCompleteEvent, IUploadProgress, IUploadSession, IUploadStartEvent } from '@/types/file-sync';
 import { WSEvent } from '@/types/websocket/events';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -10,6 +15,7 @@ import {
   requestUploadSessions,
   resumeUpload,
 } from '../commands/uploadCommands';
+
 import { on } from '@/shared/api/ws/events';
 
 type SessionsState = {

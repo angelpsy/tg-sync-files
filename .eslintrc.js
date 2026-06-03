@@ -100,6 +100,7 @@ module.exports = {
   ignorePatterns: [
     'node_modules/',
     'dist/',
+    'backend/dist-vite/',
     'build/',
     '.next/',
     'coverage/',

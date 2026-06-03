@@ -1,8 +1,15 @@
 'use client';
-import { ChevronDown, ChevronRight, Eye, EyeOff, File as FileIcon, Folder as FolderIcon } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  File as FileIcon,
+  Folder as FolderIcon,
+} from 'lucide-react';
 
-import { UploadControls } from './UploadControls';
 import type { FolderTreeNodeProps } from './types';
+import { UploadControls } from './UploadControls';
 
 export function TreeNode({
   node,
@@ -71,7 +78,9 @@ export function TreeNode({
               title={filesHiddenHere ? 'Show files' : 'Hide files'}
             >
               {filesHiddenHere ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
-              <span className="text-[10px] hidden sm:inline">{filesHiddenHere ? 'Show' : 'Hide'}</span>
+              <span className="text-[10px] hidden sm:inline">
+                {filesHiddenHere ? 'Show' : 'Hide'}
+              </span>
             </button>
           </span>
         )}
@@ -81,7 +90,9 @@ export function TreeNode({
         <div className="ml-2 pl-3 border-l border-border/50">
           <UploadControls
             folderPath={node.path}
-            directFiles={(node.children || []).filter(child => child.type === 'file').map(file => file.name)}
+            directFiles={(node.children || [])
+              .filter(child => child.type === 'file')
+              .map(file => file.name)}
             selectedChannelId={selectedChannelId}
             topics={topics}
             activeSession={getByFolder(node.path)}

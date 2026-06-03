@@ -1,12 +1,12 @@
 'use client';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
+import { formatMegabytes, type TopicsDashboardViewModel } from './model';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileDownloadWidget } from '@/widgets/file-download/FileDownloadWidget';
-
-import { formatMegabytes, type TopicsDashboardViewModel } from './model';
 
 type TopicsDashboardViewProps = {
   vm: TopicsDashboardViewModel;
@@ -14,7 +14,11 @@ type TopicsDashboardViewProps = {
   onToggleTopic: (topicId: string) => void;
 };
 
-export function TopicsDashboardView({ vm, onSelectChannel, onToggleTopic }: TopicsDashboardViewProps) {
+export function TopicsDashboardView({
+  vm,
+  onSelectChannel,
+  onToggleTopic,
+}: TopicsDashboardViewProps) {
   return (
     <Card className="h-[calc(50vh-5.5rem)] min-h-[260px] flex flex-col">
       <CardHeader className="py-3 flex items-center gap-3">
@@ -44,11 +48,7 @@ export function TopicsDashboardView({ vm, onSelectChannel, onToggleTopic }: Topi
             {vm.topics.map(item => (
               <li key={item.topic.id} className="py-2">
                 <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onToggleTopic(item.topic.id)}
-                  >
+                  <Button size="sm" variant="ghost" onClick={() => onToggleTopic(item.topic.id)}>
                     {item.isExpanded ? (
                       <ChevronDown className="size-4" />
                     ) : (

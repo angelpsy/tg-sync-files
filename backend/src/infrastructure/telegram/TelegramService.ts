@@ -26,6 +26,7 @@ import type {
   ITopic,
   ITopicFileInfo,
 } from '../../../../types';
+import { EOperationStatus } from '../../../../types';
 import type { RetryConfig } from '../../config/retryConfig';
 import { RETRY_CONFIGS, RetryManager } from '../../config/retryConfig';
 
@@ -508,7 +509,7 @@ export class TelegramService implements ITelegramService {
         targetPath,
         startedAt: new Date(),
         completedAt: new Date(),
-        status: 'completed' as any, // Temporary bypass since I changed it to enum
+        status: EOperationStatus.COMPLETED,
       };
       return result;
     });

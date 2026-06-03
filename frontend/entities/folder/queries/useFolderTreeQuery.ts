@@ -2,9 +2,9 @@
 import { WSEvent } from '@/types/websocket/events';
 import { useEffect, useRef, useState } from 'react';
 
+import { adaptFolderTreePayload } from '../adapters/folderTreePayloadAdapter';
 import type { IFolderTree } from '../types';
 
-import { adaptFolderTreePayload } from '../adapters/folderTreePayloadAdapter';
 import { on } from '@/shared/api/ws/events';
 
 /**

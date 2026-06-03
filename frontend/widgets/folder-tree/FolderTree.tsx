@@ -1,14 +1,14 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 
+import { TreeNode, TreeToolbar } from './components';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useChannelsQuery, usePersistedChannelSelectionQuery } from '@/entities/channel';
-import type { IFolderTree } from '@/entities/folder/types';
 import { useFolderTreeQuery } from '@/entities/folder';
+import type { IFolderTree } from '@/entities/folder/types';
 import { useTopicsQuery } from '@/entities/topic';
 import { startFolderUpload, useUploadSessionsQuery } from '@/entities/upload';
-
-import { TreeNode, TreeToolbar } from './components';
 
 /**
  * FolderTree widget – renders current scanned folder tree snapshot from WS events.
@@ -80,7 +80,9 @@ export function FolderTree() {
   const content = useMemo(() => {
     if (!tree) {
       return (
-        <div className="text-sm text-muted-foreground">No data yet. Waiting for folder_tree_update…</div>
+        <div className="text-sm text-muted-foreground">
+          No data yet. Waiting for folder_tree_update…
+        </div>
       );
     }
 

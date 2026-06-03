@@ -1,15 +1,15 @@
 'use client';
 import { useMemo, useState } from 'react';
 
-import { useChannelStatusesQuery } from '@/entities/channel/queries/useChannelStatusesQuery';
+import { buildTopicsDashboardViewModel } from './model';
+import { TopicsDashboardView } from './TopicsDashboardView';
+
 import { useChannelsQuery } from '@/entities/channel/queries/useChannelsQuery';
+import { useChannelStatusesQuery } from '@/entities/channel/queries/useChannelStatusesQuery';
 import { usePersistedChannelSelectionQuery } from '@/entities/channel/queries/usePersistedChannelSelectionQuery';
 import { useTopicFilesListQuery } from '@/entities/topic/queries/useTopicFilesListQuery';
 import { useTopicFilesQuery } from '@/entities/topic/queries/useTopicFilesQuery';
 import { useTopicsQuery } from '@/entities/topic/queries/useTopicsQuery';
-
-import { buildTopicsDashboardViewModel } from './model';
-import { TopicsDashboardView } from './TopicsDashboardView';
 
 export function TopicsDashboard() {
   const { channels, single } = useChannelsQuery();
@@ -54,7 +54,9 @@ export function TopicsDashboard() {
     <TopicsDashboardView
       vm={viewModel}
       onSelectChannel={setSelectedChannelId}
-      onToggleTopic={topicId => setExpandedTopicId(prev => (prev === topicId ? undefined : topicId))}
+      onToggleTopic={topicId =>
+        setExpandedTopicId(prev => (prev === topicId ? undefined : topicId))
+      }
     />
   );
 }

@@ -1,4 +1,5 @@
 import { mkdir } from 'fs/promises';
+import { Buffer } from 'node:buffer';
 import { dirname, join } from 'path';
 
 import bigInt, { type BigInteger } from 'big-integer';
@@ -19,16 +20,149 @@ import type {
   IDownloadResult,
   IFileInfo,
   IStorageService,
+  ITelegramAuthCodeDelivery,
   ITelegramChannel,
+  ITelegramQrAuthStartResult,
+  ITelegramQrAuthToken,
+  ITelegramQrAuthWaitResult,
   ITelegramService,
   ITelegramSession,
+  ITelegramStartAuthResult,
   ITelegramUserMinimal,
   ITopic,
   ITopicFileInfo,
+  TTelegramAuthCodeDeliveryType,
 } from '../../../../types';
 import { EOperationStatus } from '../../../../types';
 import type { RetryConfig } from '../../config/retryConfig';
 import { RETRY_CONFIGS, RetryManager } from '../../config/retryConfig';
+
+type TelegramConstructorLike = {
+  className?: string;
+  length?: number;
+  pattern?: string;
+  prefix?: string;
+  emailPattern?: string;
+  beginning?: string;
+  pushTimeout?: number;
+};
+
+type QrAuthPromiseControls = {
+  resolve: (result: ITelegramQrAuthWaitResult) => void;
+  reject: (error: Error) => void;
+};
+
+const AUTH_CODE_DELIVERY_LABELS: Record<TTelegramAuthCodeDeliveryType, string> = {
+  app: 'Telegram app',
+  sms: 'SMS',
+  call: 'phone call',
+  flash_call: 'flash call',
+  missed_call: 'missed call',
+  email: 'email',
+  email_setup: 'email setup',
+  fragment_sms: 'Fragment SMS',
+  firebase_sms: 'Firebase SMS',
+  sms_word: 'SMS word',
+  sms_phrase: 'SMS phrase',
+  unknown: 'unknown method',
+};
+
+function maskPhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace(/(\+?\d{0,2})\d{3}(\d{2,})/, '$1***$2');
+}
+
+function normalizeTelegramPhone(phoneNumber?: string): string | undefined {
+  if (!phoneNumber) return undefined;
+  return phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+}
+
+function buildQrAuthToken(token: Buffer, expires: number): ITelegramQrAuthToken {
+  const expiresAt = new Date(expires * 1000).toISOString();
+  return {
+    url: `tg://login?token=${token.toString('base64url')}`,
+    expiresAt,
+    expiresInSec: Math.max(0, Math.floor(expires - Date.now() / 1000)),
+  };
+}
+
+function getTelegramConstructorName(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const className = (value as TelegramConstructorLike).className;
+  if (typeof className === 'string') return className;
+  const constructorName = (value as { constructor?: { name?: unknown } }).constructor?.name;
+  return typeof constructorName === 'string' ? constructorName : undefined;
+}
+
+function normalizeAuthCodeDeliveryType(rawType?: string): TTelegramAuthCodeDeliveryType {
+  const name = rawType?.replace(/^auth\./, '');
+
+  switch (name) {
+    case 'SentCodeTypeApp':
+      return 'app';
+    case 'SentCodeTypeSms':
+    case 'CodeTypeSms':
+      return 'sms';
+    case 'SentCodeTypeCall':
+    case 'CodeTypeCall':
+      return 'call';
+    case 'SentCodeTypeFlashCall':
+    case 'CodeTypeFlashCall':
+      return 'flash_call';
+    case 'SentCodeTypeMissedCall':
+    case 'CodeTypeMissedCall':
+      return 'missed_call';
+    case 'SentCodeTypeEmailCode':
+      return 'email';
+    case 'SentCodeTypeSetUpEmailRequired':
+      return 'email_setup';
+    case 'SentCodeTypeFragmentSms':
+    case 'CodeTypeFragmentSms':
+      return 'fragment_sms';
+    case 'SentCodeTypeFirebaseSms':
+      return 'firebase_sms';
+    case 'SentCodeTypeSmsWord':
+      return 'sms_word';
+    case 'SentCodeTypeSmsPhrase':
+      return 'sms_phrase';
+    default:
+      return 'unknown';
+  }
+}
+
+function extractAuthCodeDelivery(sentCode: unknown): ITelegramAuthCodeDelivery | undefined {
+  if (!sentCode || typeof sentCode !== 'object') return undefined;
+
+  const sentCodeObject = sentCode as {
+    type?: unknown;
+    nextType?: unknown;
+    timeout?: unknown;
+  };
+  const typeObject = sentCodeObject.type as TelegramConstructorLike | undefined;
+  const rawType = getTelegramConstructorName(typeObject);
+  const type = normalizeAuthCodeDeliveryType(rawType);
+  const rawNextType = getTelegramConstructorName(sentCodeObject.nextType);
+  const nextType = rawNextType ? normalizeAuthCodeDeliveryType(rawNextType) : undefined;
+  const timeout =
+    typeof sentCodeObject.timeout === 'number'
+      ? sentCodeObject.timeout
+      : typeof typeObject?.pushTimeout === 'number'
+        ? typeObject.pushTimeout
+        : undefined;
+  const pattern =
+    typeObject?.emailPattern ?? typeObject?.pattern ?? typeObject?.prefix ?? typeObject?.beginning;
+
+  return {
+    type,
+    label: AUTH_CODE_DELIVERY_LABELS[type],
+    rawType,
+    nextType,
+    nextLabel: nextType ? AUTH_CODE_DELIVERY_LABELS[nextType] : undefined,
+    rawNextType,
+    timeoutSec: timeout,
+    length: typeof typeObject?.length === 'number' ? typeObject.length : undefined,
+    pattern,
+  };
+}
 
 /**
  * TelegramService – реализация ITelegramService поверх GramJS
@@ -44,6 +178,11 @@ export class TelegramService implements ITelegramService {
   // Stepwise auth state
   private authPhone?: string;
   private phoneCodeHash?: string;
+  private authDelivery?: ITelegramAuthCodeDelivery;
+  private qrAuthPromise?: Promise<ITelegramQrAuthWaitResult>;
+  private qrAuthControls?: QrAuthPromiseControls;
+  private qrAuthPending = false;
+  private qrAuthFlowId = 0;
   private hasRestoredSession = false;
 
   constructor(
@@ -57,6 +196,261 @@ export class TelegramService implements ITelegramService {
     this.retryManager = new RetryManager(this.retryConfig);
   }
 
+  private createClient(stringSession = ''): TelegramClient {
+    return new TelegramClient(new StringSession(stringSession), this.apiId, this.apiHash, {
+      connectionRetries: this.retryConfig.maxAttempts,
+    });
+  }
+
+  private async resetToUnauthenticatedClient(reason: string): Promise<void> {
+    if (this.client) {
+      await this.client.disconnect().catch(() => undefined);
+    }
+
+    this.client = this.createClient();
+    this.isInitialized = true;
+    this.hasRestoredSession = false;
+    this.channelCache = null;
+    this.logger.info('Telegram client reset to unauthenticated auth session', { reason });
+  }
+
+  private isInvalidStoredSessionError(error: unknown): boolean {
+    const message = (error as Error | undefined)?.message ?? '';
+    return (
+      message.includes('AUTH_KEY_UNREGISTERED') ||
+      message.includes('AUTH_KEY_INVALID') ||
+      message.includes('SESSION_REVOKED') ||
+      message.includes('SESSION_EXPIRED')
+    );
+  }
+
+  private isSendCodeUnavailableError(error: unknown): boolean {
+    const maybeError = error as { errorMessage?: unknown; message?: unknown };
+    return (
+      maybeError.errorMessage === 'SEND_CODE_UNAVAILABLE' ||
+      (typeof maybeError.message === 'string' &&
+        maybeError.message.includes('SEND_CODE_UNAVAILABLE'))
+    );
+  }
+
+  private isPasswordNeededError(error: unknown): boolean {
+    const message = (error as Error | undefined)?.message ?? '';
+    const errorMessage = (error as { errorMessage?: unknown } | undefined)?.errorMessage;
+    return (
+      errorMessage === 'SESSION_PASSWORD_NEEDED' || message.includes('SESSION_PASSWORD_NEEDED')
+    );
+  }
+
+  private createQrAuthPromise(): Promise<ITelegramQrAuthWaitResult> {
+    return new Promise<ITelegramQrAuthWaitResult>((resolve, reject) => {
+      this.qrAuthControls = { resolve, reject };
+    });
+  }
+
+  private clearQrAuthState(): void {
+    this.qrAuthPromise = undefined;
+    this.qrAuthControls = undefined;
+    this.qrAuthPending = false;
+  }
+
+  private async exportQrAuthToken(client: TelegramClient): Promise<ITelegramQrAuthToken> {
+    const result = await client.invoke(
+      new Api.auth.ExportLoginToken({
+        apiId: this.apiId,
+        apiHash: this.apiHash,
+        exceptIds: [],
+      })
+    );
+
+    if (!(result instanceof Api.auth.LoginToken)) {
+      throw new Error(`Unexpected QR auth token response: ${result.className}`);
+    }
+
+    return buildQrAuthToken(Buffer.from(result.token), result.expires);
+  }
+
+  private async saveClientSession(phoneNumber?: string): Promise<ITelegramSession> {
+    const client = this.getClient();
+    const saved = client.session.save();
+    const sessionData = typeof saved === 'string' ? saved : '';
+    const session: ITelegramSession = {
+      id: '1',
+      sessionData,
+      stringSession: sessionData,
+      phoneNumber: normalizeTelegramPhone(phoneNumber),
+      isActive: true,
+      lastUsed: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await this.storageService.saveTelegramSession(session);
+    this.hasRestoredSession = true;
+    this.channelCache = null;
+    return session;
+  }
+
+  private async completeQrAuth(client: TelegramClient): Promise<ITelegramQrAuthWaitResult> {
+    const result = await client.invoke(
+      new Api.auth.ExportLoginToken({
+        apiId: this.apiId,
+        apiHash: this.apiHash,
+        exceptIds: [],
+      })
+    );
+
+    let authorization: Api.auth.TypeAuthorization | undefined;
+
+    if (result instanceof Api.auth.LoginTokenSuccess) {
+      authorization = result.authorization;
+    } else if (result instanceof Api.auth.LoginTokenMigrateTo) {
+      await (client as unknown as { _switchDC: (dcId: number) => Promise<void> })._switchDC(
+        result.dcId
+      );
+      const migratedResult = await client.invoke(
+        new Api.auth.ImportLoginToken({
+          token: result.token,
+        })
+      );
+      if (migratedResult instanceof Api.auth.LoginTokenSuccess) {
+        authorization = migratedResult.authorization;
+      }
+    }
+
+    if (!(authorization instanceof Api.auth.Authorization)) {
+      throw new Error(`Unexpected QR auth completion response: ${result.className}`);
+    }
+
+    const phoneNumber = normalizeTelegramPhone(
+      (authorization.user as unknown as { phone?: string }).phone
+    );
+    const session = await this.saveClientSession(phoneNumber);
+    this.authPhone = undefined;
+    this.phoneCodeHash = undefined;
+    this.authDelivery = undefined;
+    this.logger.info('QR auth completed successfully', {
+      maskedPhone: session.phoneNumber ? maskPhoneNumber(session.phoneNumber) : undefined,
+    });
+
+    return {
+      success: true,
+      maskedPhone: session.phoneNumber ? maskPhoneNumber(session.phoneNumber) : undefined,
+    };
+  }
+
+  private async handleQrLoginTokenUpdate(flowId: number, update: unknown): Promise<void> {
+    if (flowId !== this.qrAuthFlowId || !this.qrAuthPending) return;
+    if (!(update instanceof Api.UpdateLoginToken)) return;
+
+    this.logger.info('QR login token scanned');
+    const controls = this.qrAuthControls;
+    try {
+      const result = await this.completeQrAuth(this.getClient());
+      this.clearQrAuthState();
+      controls?.resolve(result);
+    } catch (error) {
+      if (this.isPasswordNeededError(error)) {
+        this.clearQrAuthState();
+        controls?.resolve({ needsPassword: true });
+        return;
+      }
+
+      this.clearQrAuthState();
+      controls?.reject(error as Error);
+    }
+  }
+
+  private async prepareClientForAuth(): Promise<TelegramClient> {
+    if (!this.client || !this.isInitialized) {
+      await this.initialize();
+    }
+
+    if (this.qrAuthPending || this.qrAuthPromise) {
+      await this.cancelQrAuth().catch(() => undefined);
+    }
+
+    if (this.hasRestoredSession) {
+      this.logger.warn('Stored Telegram session present while starting auth, clearing it first');
+      await this.storageService.clearTelegramSessions();
+      await this.resetToUnauthenticatedClient('start auth with phone code');
+    } else if (this.authPhone || this.phoneCodeHash) {
+      await this.resetToUnauthenticatedClient('restart phone code auth');
+      this.authPhone = undefined;
+      this.phoneCodeHash = undefined;
+      this.authDelivery = undefined;
+    }
+
+    const client = this.getClient();
+    await client.connect();
+    return client;
+  }
+
+  private logAuthClientConnection(operation: 'send' | 'resend'): void {
+    const session = this.getClient().session as unknown as {
+      dcId?: number;
+      serverAddress?: string;
+      port?: number;
+    };
+    this.logger.info('Telegram auth client connected', {
+      operation,
+      dcId: session.dcId,
+      serverAddress: session.serverAddress,
+      port: session.port,
+    });
+  }
+
+  private getAuthClientConnectionInfo(): {
+    dcId?: number;
+    serverAddress?: string;
+    port?: number;
+  } {
+    const session = this.getClient().session as unknown as {
+      dcId?: number;
+      serverAddress?: string;
+      port?: number;
+    };
+    return {
+      dcId: session.dcId,
+      serverAddress: session.serverAddress,
+      port: session.port,
+    };
+  }
+
+  private buildStartAuthResult(
+    phoneNumber: string,
+    sentCode: unknown,
+    operation: 'send' | 'resend'
+  ): ITelegramStartAuthResult {
+    const delivery = extractAuthCodeDelivery(sentCode);
+    const anyRes = sentCode as { phoneCodeHash?: string };
+    this.authPhone = phoneNumber;
+    this.phoneCodeHash = anyRes.phoneCodeHash;
+    this.authDelivery = delivery;
+    const maskedPhone = maskPhoneNumber(phoneNumber);
+
+    this.logger.info(
+      operation === 'send'
+        ? 'auth.SendCode response received'
+        : 'auth.ResendCode response received',
+      {
+        maskedPhone,
+        deliveryType: delivery?.type,
+        rawDeliveryType: delivery?.rawType,
+        nextDeliveryType: delivery?.nextType,
+        rawNextDeliveryType: delivery?.rawNextType,
+        timeoutSec: delivery?.timeoutSec,
+        codeLength: delivery?.length,
+        hasHash: !!this.phoneCodeHash,
+        authClient: this.getAuthClientConnectionInfo(),
+      }
+    );
+
+    return {
+      needsCode: true,
+      maskedPhone,
+      delivery,
+    };
+  }
+
   /** Initializes client restoring existing session if present */
   async initialize(): Promise<void> {
     try {
@@ -65,9 +459,7 @@ export class TelegramService implements ITelegramService {
       const stringSession = savedSession?.sessionData || savedSession?.stringSession || '';
       this.hasRestoredSession = Boolean(stringSession);
 
-      this.client = new TelegramClient(new StringSession(stringSession), this.apiId, this.apiHash, {
-        connectionRetries: this.retryConfig.maxAttempts,
-      });
+      this.client = this.createClient(stringSession);
 
       this.isInitialized = true;
       this.logger.info('Telegram client initialized successfully', {
@@ -126,14 +518,12 @@ export class TelegramService implements ITelegramService {
   }
 
   /** Starts stepwise authentication by sending code */
-  async startAuth(phoneNumber: string): Promise<{ needsCode: true; maskedPhone?: string }> {
-    if (!this.client || !this.isInitialized) {
-      await this.initialize();
-    }
-    const client = this.getClient();
-    await client.connect();
+  async startAuth(phoneNumber: string): Promise<ITelegramStartAuthResult> {
+    const client = await this.prepareClientForAuth();
+    this.logAuthClientConnection('send');
+    const maskedPhone = maskPhoneNumber(phoneNumber);
     try {
-      this.logger.info('Sending auth code requested', { phoneNumber });
+      this.logger.info('Sending auth code requested', { maskedPhone });
       const res = await client.invoke(
         new Api.auth.SendCode({
           phoneNumber,
@@ -142,23 +532,114 @@ export class TelegramService implements ITelegramService {
           settings: new Api.CodeSettings({}),
         })
       );
-      this.logger.info('auth.SendCode response received');
-      // res.phoneCodeHash contains hash for next step
-      // Store state
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const anyRes: any = res as any;
-      this.authPhone = phoneNumber;
-      this.phoneCodeHash = anyRes.phoneCodeHash as string | undefined;
-      this.logger.debug('Stored auth context', {
-        authPhone: this.authPhone,
-        hasHash: !!this.phoneCodeHash,
-      });
-      return {
-        needsCode: true,
-        maskedPhone: phoneNumber.replace(/(\+?\d{0,2})\d{3}(\d{2,})/, '$1***$2'),
-      };
+      if (res instanceof Api.auth.SentCodeSuccess) {
+        throw new Error('Already authorized immediately after requesting the code');
+      }
+
+      return this.buildStartAuthResult(phoneNumber, res, 'send');
     } catch (error) {
-      this.logger.error(error as Error, 'startAuth (sendCode) failed', { phoneNumber });
+      this.logger.error(error as Error, 'startAuth (sendCode) failed', { maskedPhone });
+      throw error;
+    }
+  }
+
+  /** Starts QR authentication by exporting a Telegram login token */
+  async startQrAuth(): Promise<ITelegramQrAuthStartResult> {
+    await this.cancelQrAuth().catch(() => undefined);
+    const client = await this.prepareClientForAuth();
+    const flowId = ++this.qrAuthFlowId;
+    this.qrAuthPending = true;
+    this.qrAuthPromise = this.createQrAuthPromise();
+
+    client.addEventHandler((update: unknown) => {
+      void this.handleQrLoginTokenUpdate(flowId, update);
+    });
+
+    try {
+      const qr = await this.exportQrAuthToken(client);
+      this.logger.info('QR auth token exported', {
+        expiresAt: qr.expiresAt,
+        expiresInSec: qr.expiresInSec,
+        authClient: this.getAuthClientConnectionInfo(),
+      });
+      return { qr };
+    } catch (error) {
+      const controls = this.qrAuthControls;
+      this.clearQrAuthState();
+      controls?.reject(error as Error);
+      this.logger.error(error as Error, 'startQrAuth failed');
+      throw error;
+    }
+  }
+
+  /** Waits for a pending QR authentication to be scanned and accepted */
+  async waitForQrAuth(): Promise<ITelegramQrAuthWaitResult> {
+    if (!this.qrAuthPromise) {
+      throw new Error('QR auth not initiated');
+    }
+    return this.qrAuthPromise;
+  }
+
+  /** Cancels pending QR authentication state */
+  async cancelQrAuth(): Promise<void> {
+    if (!this.qrAuthPending && !this.qrAuthPromise) return;
+
+    const controls = this.qrAuthControls;
+    this.qrAuthFlowId++;
+    this.clearQrAuthState();
+    controls?.reject(new Error('QR_AUTH_CANCELLED'));
+    this.logger.info('QR auth cancelled');
+  }
+
+  /** Requests Telegram to resend/switch delivery method for the current auth code */
+  async resendAuthCode(): Promise<ITelegramStartAuthResult> {
+    if (!this.authPhone || !this.phoneCodeHash) {
+      throw new Error('Auth not initiated');
+    }
+
+    const client = this.getClient();
+    await client.connect();
+    this.logAuthClientConnection('resend');
+    const maskedPhone = maskPhoneNumber(this.authPhone);
+
+    try {
+      this.logger.info('Resending auth code requested', { maskedPhone });
+      const res = await client.invoke(
+        new Api.auth.ResendCode({
+          phoneNumber: this.authPhone,
+          phoneCodeHash: this.phoneCodeHash,
+        })
+      );
+
+      if (res instanceof Api.auth.SentCodeSuccess) {
+        throw new Error('Already authorized immediately after resending the code');
+      }
+
+      return this.buildStartAuthResult(this.authPhone, res, 'resend');
+    } catch (error) {
+      if (this.isSendCodeUnavailableError(error)) {
+        const delivery: ITelegramAuthCodeDelivery = {
+          ...(this.authDelivery ?? {
+            type: 'unknown',
+            label: AUTH_CODE_DELIVERY_LABELS.unknown,
+          }),
+          resendUnavailable: true,
+          resendUnavailableReason: 'SEND_CODE_UNAVAILABLE',
+        };
+        this.authDelivery = delivery;
+        this.logger.warn('Telegram refused to resend auth code for this auth attempt', {
+          maskedPhone,
+          deliveryType: delivery.type,
+          rawDeliveryType: delivery.rawType,
+          reason: delivery.resendUnavailableReason,
+        });
+        return {
+          needsCode: true,
+          maskedPhone,
+          delivery,
+        };
+      }
+      this.logger.error(error as Error, 'resendAuthCode failed', { maskedPhone });
       throw error;
     }
   }
@@ -205,6 +686,7 @@ export class TelegramService implements ITelegramService {
         // Clear auth state
         this.authPhone = undefined;
         this.phoneCodeHash = undefined;
+        this.authDelivery = undefined;
         return { success: true, maskedPhone: session.phoneNumber };
       }
       // If we receive auth.AuthorizationSignUpRequired or similar, treat as success for now
@@ -237,21 +719,11 @@ export class TelegramService implements ITelegramService {
       this.logger.debug('SRP check computed');
       await client.invoke(new Api.auth.CheckPassword({ password: passwordCheck }));
       this.logger.info('auth.CheckPassword success');
-      const saved = client.session.save();
-      const sessionData = typeof saved === 'string' ? saved : '';
-      const session: ITelegramSession = {
-        id: '1',
-        sessionData,
-        stringSession: sessionData,
-        phoneNumber: this.authPhone,
-        isActive: true,
-        lastUsed: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      await this.storageService.saveTelegramSession(session);
+      const me = await this.getMeMinimal();
+      const session = await this.saveClientSession(this.authPhone ?? me?.phone);
       this.authPhone = undefined;
       this.phoneCodeHash = undefined;
+      this.authDelivery = undefined;
       return { success: true, maskedPhone: session.phoneNumber };
     } catch (error) {
       this.logger.error(error as Error, 'submitPassword failed');
@@ -615,6 +1087,10 @@ export class TelegramService implements ITelegramService {
       this.logger.debug('checkSession: client not initialized');
       return false;
     }
+    if (this.authPhone || this.phoneCodeHash || this.qrAuthPending) {
+      this.logger.debug('checkSession: auth flow is pending');
+      return false;
+    }
     try {
       await this.ensureClientConnected();
       this.logger.debug('checkSession: calling getMe()...');
@@ -625,6 +1101,11 @@ export class TelegramService implements ITelegramService {
       this.logger.warn('checkSession: session is invalid or expired', {
         error: (e as Error).message,
       });
+      if (this.hasRestoredSession && this.isInvalidStoredSessionError(e)) {
+        this.logger.warn('Clearing invalid stored Telegram session');
+        await this.storageService.clearTelegramSessions();
+        await this.resetToUnauthenticatedClient('stored session invalid');
+      }
       return false;
     }
   }
@@ -782,6 +1263,11 @@ export class TelegramService implements ITelegramService {
       this.logger.warn('Stored Telegram session could not be restored', {
         error: (error as Error).message,
       });
+      if (this.isInvalidStoredSessionError(error)) {
+        this.logger.warn('Clearing invalid stored Telegram session after restore failure');
+        await this.storageService.clearTelegramSessions();
+        await this.resetToUnauthenticatedClient('stored session restore failed');
+      }
     }
   }
 
@@ -798,6 +1284,10 @@ export class TelegramService implements ITelegramService {
       await this.client.disconnect();
       this.client = null;
       this.isInitialized = false;
+      this.authPhone = undefined;
+      this.phoneCodeHash = undefined;
+      this.authDelivery = undefined;
+      this.clearQrAuthState();
       this.logger.info('Telegram client disconnected');
     }
   }

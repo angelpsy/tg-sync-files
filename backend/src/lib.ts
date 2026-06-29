@@ -13,7 +13,10 @@ import type {
   ISchedulerService,
   ISocketService,
   IStorageService,
+  ITelegramQrAuthStartResult,
+  ITelegramQrAuthWaitResult,
   ITelegramService,
+  ITelegramStartAuthResult,
   ITelegramUserMinimal,
   IUploadOrchestrator,
 } from '../../types/index.ts';
@@ -136,35 +139,103 @@ export async function createBackendServices(): Promise<BackendServices> {
     if (hasInbound(socketService)) {
       // Auth flow: auth_init -> code -> password (optional)
       socketService.onInbound(WSEvent.AUTH_INIT, async (cid, payload: { phone: string }) => {
-        logger.info('AUTH_INIT received', { cid, payload });
+        logger.info('AUTH_INIT received', { cid });
         try {
           const svc = tg as ITelegramService & {
-            startAuth?: (p: string) => Promise<{ needsCode: true; maskedPhone?: string }>;
+            startAuth?: (p: string) => Promise<ITelegramStartAuthResult>;
           };
           if (!svc.startAuth) {
             logger.error('startAuth not supported on TelegramService');
             throw new Error('startAuth not supported');
           }
-          logger.debug('Starting auth for phone', { phone: payload.phone });
+          logger.debug('Starting auth for phone');
           const res = await svc.startAuth(payload.phone);
           logger.info('Auth initiated, sending AUTH_PENDING_CODE', {
             maskedPhone: res.maskedPhone,
+            deliveryType: res.delivery?.type,
+            nextDeliveryType: res.delivery?.nextType,
+            timeoutSec: res.delivery?.timeoutSec,
           });
-          socketService.emit(WSEvent.AUTH_PENDING_CODE, { maskedPhone: res.maskedPhone });
-          // Emit state update (still unauthenticated)
-          const isOk = await tg.checkSession();
-          const getMe = (tg as WithMe).getMeMinimal?.bind(tg as ITelegramService);
-          const maybeUser = getMe ? await getMe() : null;
-          socketService.emit(WSEvent.AUTH_STATE, {
-            isAuthenticated: isOk,
-            user: maybeUser ?? undefined,
+          socketService.emit(WSEvent.AUTH_PENDING_CODE, {
+            maskedPhone: res.maskedPhone,
+            delivery: res.delivery,
           });
+          socketService.emit(WSEvent.AUTH_STATE, { isAuthenticated: false });
         } catch (e) {
           logger.error('AUTH_INIT failed', { cid, error: e });
           socketService.emit(WSEvent.AUTH_ERROR, {
             code: 'AUTH_INIT_FAILED',
             message: (e as Error).message,
           });
+        }
+      });
+      socketService.onInbound(WSEvent.AUTH_QR_INIT, async cid => {
+        logger.info('AUTH_QR_INIT received', { cid });
+        try {
+          const svc = tg as ITelegramService & {
+            startQrAuth?: () => Promise<ITelegramQrAuthStartResult>;
+            waitForQrAuth?: () => Promise<ITelegramQrAuthWaitResult>;
+          };
+          if (!svc.startQrAuth || !svc.waitForQrAuth) {
+            throw new Error('QR auth not supported');
+          }
+
+          const res = await svc.startQrAuth();
+          socketService.emit(WSEvent.AUTH_QR_CODE, res.qr);
+          socketService.emit(WSEvent.AUTH_STATE, { isAuthenticated: false });
+
+          void svc
+            .waitForQrAuth()
+            .then(async result => {
+              if ('needsPassword' in result) {
+                socketService.emit(WSEvent.AUTH_PENDING_PASSWORD, {
+                  maskedPhone: result.maskedPhone,
+                });
+                socketService.emit(WSEvent.AUTH_STATE, { isAuthenticated: false });
+                return;
+              }
+
+              socketService.emit(WSEvent.AUTH_SUCCESS, { maskedPhone: result.maskedPhone || '' });
+              try {
+                const channels = await tg.getChannels();
+                socketService.emit(WSEvent.CHANNELS_SNAPSHOT, channels);
+              } catch (err) {
+                logger.warn('emit channels after QR auth failed', { error: err });
+              }
+
+              const isOk = await tg.checkSession();
+              const getMe = (tg as WithMe).getMeMinimal?.bind(tg as ITelegramService);
+              const maybeUser = getMe ? await getMe() : null;
+              socketService.emit(WSEvent.AUTH_STATE, {
+                isAuthenticated: isOk,
+                user: maybeUser ?? undefined,
+              });
+            })
+            .catch(error => {
+              if ((error as Error).message === 'QR_AUTH_CANCELLED') return;
+              logger.error('QR auth wait failed', { cid, error });
+              socketService.emit(WSEvent.AUTH_ERROR, {
+                code: 'AUTH_QR_FAILED',
+                message: (error as Error).message,
+              });
+            });
+        } catch (e) {
+          logger.error('AUTH_QR_INIT failed', { cid, error: e });
+          socketService.emit(WSEvent.AUTH_ERROR, {
+            code: 'AUTH_QR_INIT_FAILED',
+            message: (e as Error).message,
+          });
+        }
+      });
+      socketService.onInbound(WSEvent.AUTH_QR_CANCEL, async cid => {
+        logger.info('AUTH_QR_CANCEL received', { cid });
+        try {
+          const svc = tg as ITelegramService & {
+            cancelQrAuth?: () => Promise<void>;
+          };
+          await svc.cancelQrAuth?.();
+        } catch (e) {
+          logger.warn('AUTH_QR_CANCEL failed', { cid, error: e });
         }
       });
       socketService.onInbound(WSEvent.AUTH_CODE, async (cid, payload: { code: string }) => {
@@ -181,6 +252,7 @@ export async function createBackendServices(): Promise<BackendServices> {
           const res = await svc.submitCode(payload.code);
           if ('needsPassword' in res) {
             socketService.emit(WSEvent.AUTH_PENDING_PASSWORD, { maskedPhone: res.maskedPhone });
+            socketService.emit(WSEvent.AUTH_STATE, { isAuthenticated: false });
           } else {
             socketService.emit(WSEvent.AUTH_SUCCESS, { maskedPhone: res.maskedPhone || '' });
             // Immediately refresh channels for client after successful auth
@@ -190,19 +262,44 @@ export async function createBackendServices(): Promise<BackendServices> {
             } catch (err) {
               logger.warn('emit channels after auth failed', { error: err });
             }
+            // Emit state update
+            const isOk = await tg.checkSession();
+            const getMe = (tg as WithMe).getMeMinimal?.bind(tg as ITelegramService);
+            const maybeUser = getMe ? await getMe() : null;
+            socketService.emit(WSEvent.AUTH_STATE, {
+              isAuthenticated: isOk,
+              user: maybeUser ?? undefined,
+            });
           }
-          // Emit state update
-          const isOk = await tg.checkSession();
-          const getMe = (tg as WithMe).getMeMinimal?.bind(tg as ITelegramService);
-          const maybeUser = getMe ? await getMe() : null;
-          socketService.emit(WSEvent.AUTH_STATE, {
-            isAuthenticated: isOk,
-            user: maybeUser ?? undefined,
-          });
         } catch (e) {
           logger.error('auth_code failed', { cid, error: e });
           socketService.emit(WSEvent.AUTH_ERROR, {
             code: 'AUTH_CODE_FAILED',
+            message: (e as Error).message,
+          });
+        }
+      });
+      socketService.onInbound(WSEvent.AUTH_RESEND_CODE, async cid => {
+        try {
+          const svc = tg as ITelegramService & {
+            resendAuthCode?: () => Promise<ITelegramStartAuthResult>;
+          };
+          if (!svc.resendAuthCode) throw new Error('resendAuthCode not supported');
+          const res = await svc.resendAuthCode();
+          logger.info('Auth code resent, sending AUTH_PENDING_CODE', {
+            maskedPhone: res.maskedPhone,
+            deliveryType: res.delivery?.type,
+            nextDeliveryType: res.delivery?.nextType,
+            timeoutSec: res.delivery?.timeoutSec,
+          });
+          socketService.emit(WSEvent.AUTH_PENDING_CODE, {
+            maskedPhone: res.maskedPhone,
+            delivery: res.delivery,
+          });
+        } catch (e) {
+          logger.error('auth_resend_code failed', { cid, error: e });
+          socketService.emit(WSEvent.AUTH_ERROR, {
+            code: 'AUTH_RESEND_CODE_FAILED',
             message: (e as Error).message,
           });
         }

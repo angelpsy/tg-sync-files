@@ -9,9 +9,6 @@ const env = config({ path: resolve(__dirname, '../.env') });
 expand(env);
 
 const nextConfig: NextConfig = {
-  eslint: {
-    dirs: ['app'],
-  },
   typescript: {
     ignoreBuildErrors: false,
   },

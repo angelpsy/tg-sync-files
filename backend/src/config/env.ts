@@ -1,3 +1,4 @@
+import { homedir } from 'os';
 import { resolve } from 'path';
 
 import { config as dotenvConfig } from 'dotenv';
@@ -30,6 +31,25 @@ export interface AppConfig {
   channelIds?: string[];
 }
 
+function expandHomeDir(path: string): string {
+  if (path === '~') return homedir();
+  if (path.startsWith('~/')) return resolve(homedir(), path.slice(2));
+  return path;
+}
+
+function normalizeWatchPath(path: string): string {
+  const expanded = expandHomeDir(path.trim());
+  return resolve(expanded);
+}
+
+function parseWatchPaths(value: string): string[] {
+  return value
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(normalizeWatchPath);
+}
+
 export function loadConfig(): AppConfig {
   const parsed = EnvSchema.parse(process.env as Record<string, string | undefined>);
   const wsPort = parsed.BACKEND_WS_PORT ? parseInt(parsed.BACKEND_WS_PORT, 10) : 0;
@@ -42,11 +62,9 @@ export function loadConfig(): AppConfig {
         .filter(Boolean)
     : undefined;
   if (parsed.WATCH_PATHS) {
-    watchPaths = parsed.WATCH_PATHS.split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
+    watchPaths = parseWatchPaths(parsed.WATCH_PATHS);
   } else if (parsed.WATCH_DIR) {
-    watchPaths = [parsed.WATCH_DIR.trim()].filter(Boolean);
+    watchPaths = parseWatchPaths(parsed.WATCH_DIR);
   }
   return {
     env: parsed.NODE_ENV,

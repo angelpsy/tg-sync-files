@@ -11,6 +11,53 @@ import type {
 
 import type { IChannelStatus, ITelegramChannel, ITopic } from './models.js';
 
+export type TTelegramAuthCodeDeliveryType =
+  | 'app'
+  | 'sms'
+  | 'call'
+  | 'flash_call'
+  | 'missed_call'
+  | 'email'
+  | 'email_setup'
+  | 'fragment_sms'
+  | 'firebase_sms'
+  | 'sms_word'
+  | 'sms_phrase'
+  | 'unknown';
+
+export interface ITelegramAuthCodeDelivery {
+  type: TTelegramAuthCodeDeliveryType;
+  label: string;
+  rawType?: string;
+  nextType?: TTelegramAuthCodeDeliveryType;
+  nextLabel?: string;
+  rawNextType?: string;
+  timeoutSec?: number;
+  length?: number;
+  pattern?: string;
+  resendUnavailable?: boolean;
+  resendUnavailableReason?: string;
+}
+
+export interface ITelegramStartAuthResult {
+  needsCode: true;
+  maskedPhone?: string;
+  delivery?: ITelegramAuthCodeDelivery;
+}
+
+export interface ITelegramQrAuthToken {
+  url: string;
+  expiresAt: string;
+  expiresInSec?: number;
+}
+
+export interface ITelegramQrAuthStartResult {
+  qr: ITelegramQrAuthToken;
+}
+
+export type ITelegramQrAuthWaitResult =
+  { success: true; maskedPhone?: string } | { needsPassword: true; maskedPhone?: string };
+
 /**
  * Telegram Service Interface
  * Manages Telegram MTProto connections and operations
@@ -30,7 +77,28 @@ export interface ITelegramService {
    * Starts stepwise authentication by sending a code to the phone.
    * Returns when code is sent and next step is required.
    */
-  startAuth?(phoneNumber: string): Promise<{ needsCode: true; maskedPhone?: string }>;
+  startAuth?(phoneNumber: string): Promise<ITelegramStartAuthResult>;
+
+  /**
+   * Requests Telegram to resend the current auth code, usually switching from app code to SMS/call
+   * when Telegram allows another delivery method.
+   */
+  resendAuthCode?(): Promise<ITelegramStartAuthResult>;
+
+  /**
+   * Starts QR login by exporting a short-lived Telegram login token.
+   */
+  startQrAuth?(): Promise<ITelegramQrAuthStartResult>;
+
+  /**
+   * Waits for a QR login scan to complete.
+   */
+  waitForQrAuth?(): Promise<ITelegramQrAuthWaitResult>;
+
+  /**
+   * Cancels a pending QR login flow.
+   */
+  cancelQrAuth?(): Promise<void>;
 
   /**
    * Submits the received code. If 2FA password is required, returns that requirement.

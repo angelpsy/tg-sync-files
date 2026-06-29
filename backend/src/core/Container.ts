@@ -2,7 +2,7 @@ import prismaPkg from '@prisma/client';
 import type { PrismaClient as PrismaClientType } from '@prisma/client';
 
 const { PrismaClient } = prismaPkg as unknown as {
-  PrismaClient: new () => PrismaClientType;
+  PrismaClient: new (options?: Record<string, unknown>) => PrismaClientType;
 };
 
 import { serviceLoggers } from '../../../shared/logger.mts';
@@ -16,6 +16,7 @@ import type {
   IUploadOrchestrator,
 } from '../../../types/index.js';
 import type { AppConfig } from '../config/env';
+import { createPrismaAdapter } from '../config/database';
 import { FSService } from '../infrastructure/fs/FSService';
 import { ensureDatabaseSchema } from '../infrastructure/storage/PrismaSetup';
 import { StorageService } from '../infrastructure/storage/StorageService';
@@ -43,7 +44,7 @@ export class ServiceContainer {
     const logger = serviceLoggers.api;
 
     // 1. Prisma & Storage
-    this.prisma = new PrismaClient();
+    this.prisma = new PrismaClient({ adapter: createPrismaAdapter() });
     await ensureDatabaseSchema(this.prisma, logger);
     this.storage = new StorageService(this.prisma);
 

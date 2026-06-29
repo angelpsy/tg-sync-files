@@ -47,9 +47,15 @@ function isMissingTableError(error: unknown): boolean {
   const maybeCode = (error as { code?: unknown }).code;
   if (maybeCode === 'P2021') return true;
   const maybeMessage = (error as { message?: unknown }).message;
-  return (
-    typeof maybeMessage === 'string' &&
-    maybeMessage.includes('does not exist in the current database')
+  const maybeMetaMessage = (error as { meta?: { message?: unknown } }).meta?.message;
+  const messages = [maybeMessage, maybeMetaMessage].filter(
+    (message): message is string => typeof message === 'string'
+  );
+
+  return messages.some(
+    message =>
+      message.includes('does not exist in the current database') ||
+      message.includes('no such table:')
   );
 }
 

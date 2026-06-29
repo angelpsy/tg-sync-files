@@ -56,6 +56,9 @@ export enum WSEvent {
 
   // Auth flow
   AUTH_INIT = 'auth_init',
+  AUTH_QR_INIT = 'auth_qr_init',
+  AUTH_QR_CANCEL = 'auth_qr_cancel',
+  AUTH_RESEND_CODE = 'auth_resend_code',
   AUTH_CODE = 'auth_code',
   AUTH_PASSWORD = 'auth_password',
   AUTH_LOGOUT = 'auth_logout',
@@ -63,6 +66,7 @@ export enum WSEvent {
   REQUEST_AUTH_STATE = 'request_auth_state',
 
   // Auth responses
+  AUTH_QR_CODE = 'auth_qr_code',
   AUTH_PENDING_CODE = 'auth_pending_code',
   AUTH_PENDING_PASSWORD = 'auth_pending_password',
   AUTH_SUCCESS = 'auth_success',

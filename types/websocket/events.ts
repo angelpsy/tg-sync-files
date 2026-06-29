@@ -22,7 +22,9 @@ import type {
 } from '../file-sync/index.js';
 import type {
   IChannelStatus,
+  ITelegramAuthCodeDelivery,
   ITelegramChannel,
+  ITelegramQrAuthToken,
   ITelegramUserMinimal,
   ITopic,
 } from '../telegram/index.js';
@@ -106,12 +108,16 @@ export interface EventPayloadMap {
   request_download_sessions: Record<string, never>;
   // Auth requests
   auth_init: { phone: string };
+  auth_qr_init: Record<string, never>;
+  auth_qr_cancel: Record<string, never>;
+  auth_resend_code: Record<string, never>;
   auth_code: { code: string };
   auth_password: { password: string };
   auth_logout: Record<string, never>;
   request_auth_state: Record<string, never>;
   // Auth responses
-  auth_pending_code: { maskedPhone?: string };
+  auth_qr_code: ITelegramQrAuthToken;
+  auth_pending_code: { maskedPhone?: string; delivery?: ITelegramAuthCodeDelivery };
   auth_pending_password: { maskedPhone?: string };
   auth_success: { maskedPhone: string };
   auth_error: { code: string; message: string };

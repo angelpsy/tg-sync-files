@@ -14,15 +14,15 @@ echo "🏗️ Starting production environment..."
 echo "📦 Installing dependencies..."
 pnpm install --frozen-lockfile
 
-# 2. Build the project
+# 2. Sync SQLite schema and generate Prisma Client
+echo "🧬 Synchronizing SQLite schema..."
+pnpm --filter backend prisma:sqlite:sync
+
+# 3. Build the project
 echo "🛠️ Building project..."
 pnpm build
 
-# 2.1 Ensure Prisma client is generated for backend runtime
-echo "🧬 Generating Prisma client..."
-pnpm --filter backend prisma:sqlite:generate
-
-# 3. Start production environment
+# 4. Start production environment
 echo "🚀 Starting production environment (Backend + Frontend)..."
 # Use concurrently via pnpm so it works without hardcoded node_modules path
 pnpm exec concurrently \
